@@ -7,6 +7,7 @@
 import type { LookPlan, Piece, RequestKind, StylistPlan } from "../contracts";
 import { COLOURS, PRODUCT_TYPES, SLOTS, type Slot, TYPES_BY_SLOT } from "../engine/vocabulary";
 import { structuredOutput } from "../lib/openai";
+import { type Thought, thoughtStream } from "../progress";
 
 // Four looks: enough for the critic to keep three different ones. Measured on 「下週一面試」: six looks with an
 // avoid phrase on every piece took 13.3 s to plan and 48 phrases to embed; four looks with avoid only where
@@ -137,14 +138,18 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
   };
 }
 
-/** One call to the model. `context` carries the previous looks and feedback on a refine turn. */
-export async function plan(env: Env, sentence: string, context = ""): Promise<StylistPlan> {
+/**
+ * One call to the model. `context` carries the previous looks and feedback on a refine turn. With `onThought`,
+ * the plan is streamed and each readable field (what was understood, look titles, garments) is passed on as written.
+ */
+export async function plan(env: Env, sentence: string, context = "", onThought?: (t: Thought) => void): Promise<StylistPlan> {
   const raw = await structuredOutput<StylistPlan>(env, {
     name: "stylist_plan",
     schema: SCHEMA,
     instructions: instructions(taiwanToday()),
     input: context ? `${context}\n\nThe person now says: ${sentence}` : sentence,
     effort: "none", // the plan is long to write; thinking longer did not change the looks (8.0 s vs 6.9 s)
+    onText: onThought && thoughtStream(onThought),
   });
   return tidyPlan(raw);
 }

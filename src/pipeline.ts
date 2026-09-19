@@ -13,6 +13,7 @@ import { loadCatalog } from "./engine/catalog";
 import type { EncodedBy } from "./engine/encoder";
 import { runSearches } from "./engine/run";
 import { fillLooks, queryFor } from "./fill";
+import type { ProgressEvent } from "./progress";
 
 const REVISION_BEFORE_MS = 9000; // a revision costs another search; skip it once the request is this old
 
@@ -39,15 +40,17 @@ export interface RecommendResult {
   ms: { plan: number; search: number; judge: number; total: number };
 }
 
-export async function recommend(env: Env, sentence: string, context = ""): Promise<RecommendResult> {
+/** `onEvent` (optional) hears the stylist's plan as it is written and each step as it starts. */
+export async function recommend(env: Env, sentence: string, context = "", onEvent?: (e: ProgressEvent) => void): Promise<RecommendResult> {
   const t0 = Date.now();
-  const plan = await stylistPlan(env, sentence, context);
+  const plan = await stylistPlan(env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })));
   const tPlan = Date.now();
   const base = { kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints };
   if (plan.kind !== "outfit") {
     return { ...base, looks: [], problems: [], encoded_by: null, critic: "ok", ms: { plan: tPlan - t0, search: 0, judge: 0, total: tPlan - t0 } };
   }
 
+  onEvent?.({ type: "stage", stage: "search" });
   const catalog = await loadCatalog(env);
   const queries = plan.looks.flatMap((look) => look.pieces.map((p) => queryFor(p, plan.constraints)));
   const { results, by } = await runSearches(env, catalog, queries);
@@ -58,6 +61,7 @@ export async function recommend(env: Env, sentence: string, context = ""): Promi
 
   let verdict: CriticVerdict;
   let critic: RecommendResult["critic"] = "ok";
+  onEvent?.({ type: "stage", stage: "judge" });
   try {
     verdict = await judge(env, sentence, filled);
   } catch (error) {
@@ -71,6 +75,7 @@ export async function recommend(env: Env, sentence: string, context = ""): Promi
   const revised = new Map<string, { piece: number; why: string }>();
   const r = verdict.revise;
   if (r && Date.now() - t0 < REVISION_BEFORE_MS) {
+    onEvent?.({ type: "stage", stage: "revise" });
     const look = filled.find((l) => l.id === r.id)!;
     const piece = { ...look.plan.pieces[r.piece], search: r.search, types: undefined };
     const exclude = filled.flatMap((l) => l.items.map((i) => i.article_id));

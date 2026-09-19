@@ -23,6 +23,7 @@ export async function structuredOutput<T>(
   request: {
     name: string; schema: object; input: Input; instructions?: string; temperature?: number; model?: string;
     effort?: "none" | "low" | "medium" | "high"; // reasoning models only; defaults to OPENAI_REASONING_EFFORT
+    onText?: (soFar: string) => void; // when given, the answer is streamed and this sees the JSON as it is written
   },
 ): Promise<T> {
   const model = request.model ?? env.OPENAI_MODEL;
@@ -38,13 +39,41 @@ export async function structuredOutput<T>(
       input: request.input,
       ...thinking,
       text: { format: { type: "json_schema", name: request.name, strict: true, schema: request.schema } },
+      ...(request.onText ? { stream: true } : {}),
     }),
   });
   if (!res.ok) throw new Error(`OpenAI ${request.name} failed (${res.status})`);
+  if (request.onText) return JSON.parse(await readStream(res, request.name, request.onText)) as T;
   const body = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[] };
   const text = body.output?.flatMap((o) => o.content ?? []).find((c) => c.type === "output_text")?.text;
   if (!text) throw new Error(`OpenAI ${request.name} returned no text`);
   return JSON.parse(text) as T;
+}
+
+/** Reads a streamed response (server-sent events) and returns the full output text. */
+async function readStream(res: Response, name: string, onText: (soFar: string) => void): Promise<string> {
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  let text = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const event = JSON.parse(line.slice(6)) as { type: string; delta?: string };
+      if (event.type === "response.output_text.delta" && event.delta) {
+        text += event.delta;
+        onText(text);
+      } else if (event.type === "response.failed" || event.type === "error") {
+        throw new Error(`OpenAI ${name} failed while streaming`);
+      }
+    }
+  }
+  if (!text) throw new Error(`OpenAI ${name} returned no text`);
+  return text;
 }
 
 /** Recent embeddings, per Worker isolate: repeated queries (e.g. "<style>. A top.") skip the API call. */

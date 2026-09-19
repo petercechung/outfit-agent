@@ -23,6 +23,7 @@ const ADJUST_WORDS: Record<string, [string, string]> = {
 export interface V1Request {
   text?: string;
   lang?: string;
+  stream?: boolean; // answer as a stream of progress lines (src/routes/recommend.ts)
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 

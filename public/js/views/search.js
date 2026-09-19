@@ -13,7 +13,7 @@ import {
   attachClosetPhotos, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback, recordRound, settings,
   updateStyleProfile,
 } from "../shared/store.js";
-import { $, colourLabel, esc, formatPrice, loading, notice, onTabOpen, toast } from "../shared/ui.js";
+import { $, colourLabel, esc, formatPrice, notice, onTabOpen, toast } from "../shared/ui.js";
 import { addToJournal } from "./journal.js";
 
 const EXAMPLES = L(
@@ -43,6 +43,46 @@ let unchangedByFeedback = false; // the refined looks are the same as before (th
 let priority = null; // theme to put first, from the tapped tag
 let chosenLook = null; // index of the look the person picked with 「用這套」
 
+let thinking = null; // while waiting: {stage, understood, looks: [{title, idea, pieces: [{label, why}]}]}
+
+const STAGES = {
+  plan: L("造型師正在讀你的話、構思整套…", "The stylist is reading your words and planning looks…"),
+  search: L("在上萬件商品照片裡找每一件…", "Finding each garment among thousands of product photos…"),
+  judge: L("評審正在看照片，挑出最好的三套…", "The critic is looking at the photos and picking the best three…"),
+  revise: L("評審要換掉一件，重新找…", "The critic asked to replace one piece…"),
+};
+
+/** The stylist's plan as it streams in, then which step is running. */
+function thinkingView() {
+  if (!thinking) return "";
+  const looks = thinking.looks.map((look) => `<li class="thinking-look">
+      <strong>${esc(look.title)}</strong>${look.idea ? ` <span class="muted">${esc(look.idea)}</span>` : ""}
+      ${look.pieces.length ? `<ul>${look.pieces.map((p) => `<li>${esc(p.label)}${p.why ? `<span class="muted"> · ${esc(p.why)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+    </li>`).join("");
+  return `<div class="thinking" aria-live="polite">
+    ${thinking.understood ? `<p><span class="label">${L("我理解的是", "What I understood")}</span> ${esc(thinking.understood)}</p>` : ""}
+    ${looks ? `<ol class="thinking-looks">${looks}</ol>` : ""}
+    <p class="thinking-stage">${esc(STAGES[thinking.stage])}</p>
+  </div>`;
+}
+
+function onProgress(event) {
+  if (event.type === "stage") thinking.stage = event.stage;
+  else {
+    const { key, value } = event.thought;
+    const look = thinking.looks.at(-1);
+    if (key === "understood") thinking.understood = value;
+    else if (key === "title") thinking.looks.push({ title: value, idea: "", pieces: [] });
+    else if (key === "idea" && look) look.idea = value;
+    else if (key === "label" && look) look.pieces.push({ label: value, why: "" });
+    else if (key === "why" && look?.pieces.length) look.pieces.at(-1).why = value;
+  }
+  const box = $("#thinking");
+  if (box) box.innerHTML = thinkingView();
+}
+
+const startThinking = () => { thinking = { stage: "plan", understood: "", looks: [] }; };
+
 const requestFields = () => ({ prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...(priority ? { priority } : {}) });
 
 export async function runSearch(text = $("#q").value.trim()) {
@@ -51,12 +91,15 @@ export async function runSearch(text = $("#q").value.trim()) {
   rating = null;
   chosenLook = null;
   unchangedByFeedback = false;
-  $("#results").innerHTML = loading(L("理解你的需求，從你的衣櫃和上萬件單品裡找整套…", "Understanding your request and searching thousands of pieces…"));
+  startThinking();
+  $("#results").innerHTML = `<div id="thinking">${thinkingView()}</div>`;
   try {
-    result = attachClosetPhotos(await api.recommend({ text, ...requestFields() }));
+    result = attachClosetPhotos(await api.recommendStream({ text, ...requestFields() }, onProgress));
+    thinking = null;
     recordRound(result);
     render();
   } catch (error) {
+    thinking = null;
     $("#results").innerHTML = notice(`${L("找不到穿搭：", "No outfits: ")}${error.message}`, "warn");
   }
 }
@@ -65,14 +108,15 @@ export async function runSearch(text = $("#q").value.trim()) {
 async function refine({ text = "", adjust, regenerate = false }) {
   if (!result || refining) return;
   refining = true;
+  startThinking();
   render();
   try {
     const shownItems = result.outfits.flatMap((o) => o.items.filter((i) => !i.owned));
     const shown = { totals: result.outfits.map((o) => o.total_price), colours: shownItems.map((i) => i.colour_master) };
-    const next = await api.recommend({
+    const next = await api.recommendStream({
       refine: { previous_intent: result.intent, text, adjust, shown }, ...requestFields(),
       ...(regenerate ? { exclude_ids: shownItems.map((i) => i.article_id) } : {}),
-    });
+    }, onProgress);
     if (next.profile_delta) {
       updateStyleProfile(next.profile_delta);
       toast(L("已記進你的個人風格檔案", "Saved to your style profile"));
@@ -87,6 +131,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     toast(error.message);
   } finally {
     refining = false;
+    thinking = null;
     render();
     $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -179,7 +224,7 @@ function refineCard() {
       <input id="refineText" placeholder="${L("例如：太正式了，不要黑色", "e.g. too formal, and no black")}" autocomplete="off" aria-label="${L("你的回饋", "Your feedback")}" ${disabled}>
       <button class="icon-btn icon-btn-dark" aria-label="${L("送出回饋", "Send feedback")}" ${disabled}>${icon("sparkle")}</button>
     </form>
-    ${refining ? loading(L("依你的回饋重新搭配…", "Re-styling to your feedback…")) : ""}
+    ${refining ? `<div id="thinking">${thinkingView()}</div>` : ""}
   </section>`;
 }
 

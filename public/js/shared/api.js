@@ -17,9 +17,42 @@ async function request(method, path, body, headers = {}) {
 
 const post = (path, body = {}) => request("POST", path, body);
 
+/**
+ * The same request as api.recommend, answered line by line: onEvent sees the stylist's thoughts and each step
+ * ({type: "thought" | "stage"}) while the looks are being made; the promise resolves with the RecommendResponse.
+ */
+async function recommendStream(body, onEvent) {
+  const response = await fetch("/api/recommend", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, lang, stream: true }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `${response.status} ${response.statusText}`);
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+    for (const line of lines.filter(Boolean)) {
+      const event = JSON.parse(line);
+      if (event.type === "result") return event.result;
+      if (event.type === "error") throw new Error(event.error);
+      onEvent(event);
+    }
+  }
+  throw new Error("連線中斷，請再試一次");
+}
+
 export const api = {
   /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
   recommend: (body) => post("/api/recommend", body),
+  recommendStream,
   /** Anonymous feedback for 設計師洞察: [{article_id, action, occasion}] */
   events: (events) => post("/api/events", { events }),
   /** -> InsightsResponse (src/types.ts) */
