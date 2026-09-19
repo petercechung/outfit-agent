@@ -1,7 +1,7 @@
 // 今天 · 說一句話: a sentence -> three explained looks (最符合需求 / 最舒服 / 最省預算), then a dialogue: feedback on the
 // looks refines them. The dialogue state is the intent of the results on screen; each feedback sends it back with the
 // change (words, or a structured adjustment from a button), see src/intent/refine.ts.
-import { api } from "../shared/api.js";
+import { api, tester } from "../shared/api.js";
 import { openCart } from "../shared/cart.js";
 import { applyCutouts } from "../shared/cutout.js";
 import { L } from "../shared/i18n.js";
@@ -10,7 +10,7 @@ import { lookBoard } from "../shared/lookboard.js";
 import { closetOptionsHtml } from "../shared/options.js";
 import { intentTiles, openItemSheet, productTile, reasonList, swatchRow } from "../shared/outfit.js";
 import {
-  attachClosetPhotos, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback, recordRound, settings,
+  attachClosetPhotos, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback, recordRound,
   updateStyleProfile,
 } from "../shared/store.js";
 import { $, colourLabel, esc, formatPrice, notice, onTabOpen, toast } from "../shared/ui.js";
@@ -329,10 +329,10 @@ function renderOptions() {
   $("#searchOptions").innerHTML = `${closetOptionsHtml()}
     <div class="chips priority-chips"><span class="label">${L("優先給我", "Put first")}</span>
       ${PRIORITIES.map(([key, label]) => `<button class="chip" data-action="set-priority" data-priority="${key}" aria-pressed="${priority === key}">${esc(label)}</button>`).join("")}</div>`;
-  $("#shareNote").textContent = settings.shareSignals
-    ? L("你的需求會去識別化後匿名提供給設計師參考（不含帳號與照片），可在「我的」關閉。",
-      "Your request is shared anonymously with designers (no account or photos), after removing personal details. Turn off in Me.")
-    : "";
+  // v2 is being tested: every request is recorded in full, with the tester's name (js/shared/api.js, src/history.ts).
+  $("#shareNote").textContent = L(
+    `測試期間，你輸入的每句話、回饋和推薦結果都會完整記錄${tester.name ? `（測試者：${tester.name}）` : ""}，供開發團隊檢查效果。`,
+    `While we test, every sentence, feedback and result is recorded in full${tester.name ? ` (tester: ${tester.name})` : ""} so the team can check the results.`);
 }
 
 export function init() {

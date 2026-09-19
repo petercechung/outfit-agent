@@ -3,6 +3,7 @@
 
 import { fromV1Request, toV1Response, type V1Request } from "../compat";
 import { LIMITS } from "../config";
+import { askerOf, keepRecord } from "../history";
 import { HttpError, json, type RouteContext, readJson } from "../lib/http";
 import { recommend as run } from "../pipeline";
 import type { ProgressEvent } from "../progress";
@@ -12,7 +13,22 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
   const { sentence, context, feedback, lang } = fromV1Request(body);
   if (!sentence) throw new HttpError(400, lang === "en" ? "Please describe what you need in a sentence" : "請輸入一句話描述你的需求");
   const text = sentence.slice(0, LIMITS.maxSentenceChars * 2);
-  if (!body.stream) return json(toV1Response(await run(env, text, context), sentence, lang, feedback));
+  const asker = askerOf(request, body, lang);
+  const turn = { sentence: text, feedback };
+  const failed = (error: unknown) => {
+    console.error("recommend failed:", (error as Error).message);
+    keepRecord(ctx, env, asker, turn, { error: (error as Error).message });
+  };
+  if (!body.stream) {
+    try {
+      const result = await run(env, text, context);
+      keepRecord(ctx, env, asker, turn, { result });
+      return json(toV1Response(result, sentence, lang, feedback));
+    } catch (error) {
+      failed(error);
+      throw error;
+    }
+  }
 
   // {stream: true}: one JSON object per line — the stylist's thoughts and steps as they happen, then the result.
   const { readable, writable } = new TransformStream<string, string>();
@@ -20,9 +36,12 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
   const send = (line: ProgressEvent | { type: "result"; result: unknown } | { type: "error"; error: string }) =>
     writer.write(`${JSON.stringify(line)}\n`).catch(() => {}); // the person may have left; the answer is simply dropped
   const work = run(env, text, context, send)
-    .then((result) => send({ type: "result", result: toV1Response(result, sentence, lang, feedback) }))
+    .then((result) => {
+      keepRecord(ctx, env, asker, turn, { result });
+      return send({ type: "result", result: toV1Response(result, sentence, lang, feedback) });
+    })
     .catch((error) => {
-      console.error("recommend failed:", (error as Error).message);
+      failed(error);
       return send({ type: "error", error: lang === "en" ? "The stylist is unavailable, please try again" : "造型師暫時沒有回應，請再試一次" });
     })
     .finally(() => writer.close().catch(() => {}));
@@ -32,8 +51,19 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
   });
 }
 
-export async function recommendV2({ request, env }: RouteContext): Promise<Response> {
-  const { text, context } = await readJson<{ text?: unknown; context?: unknown }>(request, LIMITS.maxBodyBytes);
-  if (typeof text !== "string" || !text.trim()) throw new HttpError(400, "text is required");
-  return json(await run(env, text.trim().slice(0, LIMITS.maxSentenceChars), typeof context === "string" ? context.slice(0, 4000) : ""));
+export async function recommendV2({ request, env, ctx }: RouteContext): Promise<Response> {
+  const body = await readJson<{ text?: unknown; context?: unknown; tester?: unknown; client_id?: unknown }>(request, LIMITS.maxBodyBytes);
+  if (typeof body.text !== "string" || !body.text.trim()) throw new HttpError(400, "text is required");
+  const text = body.text.trim().slice(0, LIMITS.maxSentenceChars);
+  const found = askerOf(request, body, "zh");
+  const asker = { ...found, tester: found.tester ?? "api" }; // called by scripts, not the page
+  const turn = { sentence: text, feedback: null };
+  try {
+    const result = await run(env, text, typeof body.context === "string" ? body.context.slice(0, 4000) : "");
+    keepRecord(ctx, env, asker, turn, { result });
+    return json(result);
+  } catch (error) {
+    keepRecord(ctx, env, asker, turn, { error: (error as Error).message });
+    throw error;
+  }
 }

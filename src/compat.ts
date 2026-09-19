@@ -24,6 +24,8 @@ export interface V1Request {
   text?: string;
   lang?: string;
   stream?: boolean; // answer as a stream of progress lines (src/routes/recommend.ts)
+  tester?: string; // who is testing, from a ?tester= link (src/history.ts)
+  client_id?: string; // a random id this browser keeps
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 

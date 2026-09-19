@@ -12,7 +12,7 @@ import type { CriticVerdict, SearchHit, StylistPlan } from "./contracts";
 import { loadCatalog } from "./engine/catalog";
 import type { EncodedBy } from "./engine/encoder";
 import { runSearches } from "./engine/run";
-import { fillLooks, queryFor } from "./fill";
+import { fillLooks, queryFor, withinBudget } from "./fill";
 import type { ProgressEvent } from "./progress";
 
 const REVISION_BEFORE_MS = 9000; // a revision costs another search; skip it once the request is this old
@@ -38,6 +38,7 @@ export interface RecommendResult {
   encoded_by: EncodedBy | null;
   critic: "ok" | "unavailable";
   ms: { plan: number; search: number; judge: number; total: number };
+  trace: { plan: StylistPlan; verdict: CriticVerdict | null }; // for the request history (src/history.ts)
 }
 
 /** `onEvent` (optional) hears the stylist's plan as it is written and each step as it starts. */
@@ -47,7 +48,10 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   const tPlan = Date.now();
   const base = { kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints };
   if (plan.kind !== "outfit") {
-    return { ...base, looks: [], problems: [], encoded_by: null, critic: "ok", ms: { plan: tPlan - t0, search: 0, judge: 0, total: tPlan - t0 } };
+    return {
+      ...base, looks: [], problems: [], encoded_by: null, critic: "ok",
+      ms: { plan: tPlan - t0, search: 0, judge: 0, total: tPlan - t0 }, trace: { plan, verdict: null },
+    };
   }
 
   onEvent?.({ type: "stage", stage: "search" });
@@ -56,7 +60,7 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   const { results, by } = await runSearches(env, catalog, queries);
   let k = 0;
   const perLook = plan.looks.map((look) => look.pieces.map(() => results[k++]));
-  const filled = fillLooks(plan, perLook);
+  const filled = withinBudget(fillLooks(plan, perLook));
   const tSearch = Date.now();
 
   let verdict: CriticVerdict;
@@ -79,7 +83,9 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
     const look = filled.find((l) => l.id === r.id)!;
     const piece = { ...look.plan.pieces[r.piece], search: r.search, types: undefined };
     const exclude = filled.flatMap((l) => l.items.map((i) => i.article_id));
-    const again = await runSearches(env, catalog, [queryFor(piece, plan.constraints, exclude)]);
+    const budget = plan.constraints.budget_max_twd;
+    const room = budget ? budget - (look.total_price - look.items[r.piece].price) : undefined; // the swap must still fit
+    const again = await runSearches(env, catalog, [queryFor(piece, plan.constraints, exclude, room)]);
     const hit = again.results[0].hits[0];
     if (hit) {
       look.total_price += hit.price - look.items[r.piece].price;
@@ -107,5 +113,6 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   return {
     ...base, question: verdict.question ?? base.question, looks, problems: verdict.problems, encoded_by: by, critic,
     ms: { plan: tPlan - t0, search: tSearch - tPlan, judge: tJudge - tSearch, total: Date.now() - t0 },
+    trace: { plan, verdict },
   };
 }

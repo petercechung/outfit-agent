@@ -11,6 +11,11 @@
   "routes": [{ "pattern": "stylist.cechung.com", "custom_domain": true }],
   // The catalogue, vectors and thumbnails are shared with v1 (outfit.cechung.com). v2 only reads them.
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "outfit-assets" }],
+  // v2's own database: the full history of every request while we test (src/history.ts). Not shared with v1.
+  "d1_databases": [{
+    "binding": "DB", "database_name": "outfit-agent-db", "database_id": "9ad75a20-c1c9-4f0d-96a2-8b42f7d0985c",
+    "migrations_dir": "migrations"
+  }],
   // OPENAI_API_KEY is a secret: `wrangler secret put OPENAI_API_KEY` (local dev: .dev.vars).
   "vars": {
     "OPENAI_MODEL": "gpt-5.4-mini",

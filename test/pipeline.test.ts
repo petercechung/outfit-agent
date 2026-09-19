@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tidyVerdict } from "../src/agents/critic";
 import type { SearchHit, SearchResult, StylistPlan } from "../src/contracts";
-import { fillLooks } from "../src/fill";
+import { fillLooks, queryFor, withinBudget } from "../src/fill";
 
 const hit = (id: string, price: number, similarity: number): SearchHit => ({
   article_id: id, name: id, type: "T", slot: "top", colour: "Black", colour_master: "Black", pattern: "Solid",
@@ -39,6 +39,21 @@ describe("fillLooks", () => {
   it("marks a look over budget when nothing cheaper is left", () => {
     const [look] = fillLooks(plan(1, 100), [[res(hit("d1", 900, 0.9)), res(hit("s1", 500, 0.9))]]);
     expect(look.over_budget).toBe(true);
+  });
+});
+
+describe("budget", () => {
+  it("never searches for an item dearer than the whole budget", () => {
+    expect(queryFor(piece("top"), plan(1, 2500).constraints).price_max).toBe(2500);
+    expect(queryFor(piece("top"), plan(1).constraints).price_max).toBeUndefined();
+    expect(queryFor(piece("top"), plan(1, 2500).constraints, [], 700).price_max).toBe(700); // a swap within a look
+  });
+
+  it("shows over-budget looks only when none fits", () => {
+    const a = { id: "a", over_budget: false };
+    const b = { id: "b", over_budget: true };
+    expect(withinBudget([b, a])).toEqual([a]);
+    expect(withinBudget([b])).toEqual([b]);
   });
 });
 

@@ -95,6 +95,8 @@ function render() {
       ${shareSignalsHtml()}
       <p class="muted">${L("預設開啟。只送出去識別化的需求句子（電話、email、名字等會被移除）和你對商品的回饋，不含帳號、裝置或照片，30 天後刪除。設計師用它決定開什麼款、備什麼料（見「設計師洞察」）。",
         "On by default. Only your request with personal details removed (phones, emails, names…) and your reactions to products are sent — no account, device or photos — and deleted after 30 days. Designers use it to decide what to make (see For designers).")}</p>
+      <p class="muted">${L("測試期間另外會完整記錄你輸入的句子、回饋和推薦結果（連同測試者名稱與這台瀏覽器的代號），供開發團隊檢查效果；這項紀錄無法在這裡關閉。",
+        "While we test, your sentences, feedback and results are also recorded in full (with your tester name and this browser's id) so the team can check the results; this cannot be turned off here.")}</p>
     </section>
     <section class="stack">${sectionTitle(L("系統學到的偏好", "What the system learnt"))}
       <p class="muted">${L(`已累積 ${prefs.events} 次回饋（喜歡、不喜歡、換掉、收藏、購買、穿過），每次搜尋都會一起送出，用來重新排序推薦。`,

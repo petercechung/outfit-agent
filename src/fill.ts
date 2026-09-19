@@ -3,13 +3,21 @@ import type { FilledLook, Piece, SearchQuery, SearchResult, StylistPlan } from "
 
 const CANDIDATES_PER_PIECE = 8; // enough alternatives for distinct looks and budget swaps
 
-export function queryFor(piece: Piece, constraints: StylistPlan["constraints"], exclude: string[] = []): SearchQuery {
+/** `priceMax`: the most this one item may cost; by default the whole budget, since no item can cost more. */
+export function queryFor(piece: Piece, constraints: StylistPlan["constraints"], exclude: string[] = [], priceMax?: number): SearchQuery {
   return {
     slot: piece.slot, text: piece.search, avoid: piece.avoid, gender: constraints.gender,
     types: piece.types?.length ? piece.types : undefined,
     avoid_types: constraints.avoid_types, avoid_colours: constraints.avoid_colours,
+    price_max: priceMax ?? constraints.budget_max_twd ?? undefined,
     exclude_ids: exclude, limit: CANDIDATES_PER_PIECE,
   };
+}
+
+/** The budget is the person's own word: looks over it are shown only when no look fits. */
+export function withinBudget<T extends { over_budget: boolean }>(looks: T[]): T[] {
+  const fitting = looks.filter((l) => !l.over_budget);
+  return fitting.length ? fitting : looks;
 }
 
 /**

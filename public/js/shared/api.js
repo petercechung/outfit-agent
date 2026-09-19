@@ -2,6 +2,21 @@
 // Every request carries the page language, so server-written texts (reasons, insights) match it.
 import { lang } from "./i18n.js";
 
+/**
+ * Who is testing, sent with every recommendation so the team can follow each tester's history (src/history.ts).
+ * Open the site once as /?tester=名字 and this browser remembers the name; client_id is a random id per browser.
+ */
+export const tester = (() => {
+  const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+  const keep = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode: this visit only */ } };
+  const fromLink = new URLSearchParams(location.search).get("tester")?.trim().slice(0, 40);
+  if (fromLink) keep("tester", fromLink);
+  let clientId = read("client_id");
+  if (!clientId) keep("client_id", (clientId = crypto.randomUUID()));
+  return { name: fromLink || read("tester"), client_id: clientId };
+})();
+const who = () => ({ tester: tester.name ?? undefined, client_id: tester.client_id });
+
 async function request(method, path, body, headers = {}) {
   if (method === "GET") path += `${path.includes("?") ? "&" : "?"}lang=${lang}`;
   else if (body) body = { ...body, lang };
@@ -25,7 +40,7 @@ async function recommendStream(body, onEvent) {
   const response = await fetch("/api/recommend", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, lang, stream: true }),
+    body: JSON.stringify({ ...body, ...who(), lang, stream: true }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -51,7 +66,7 @@ async function recommendStream(body, onEvent) {
 
 export const api = {
   /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
-  recommend: (body) => post("/api/recommend", body),
+  recommend: (body) => post("/api/recommend", { ...body, ...who() }),
   recommendStream,
   /** Anonymous feedback for 設計師洞察: [{article_id, action, occasion}] */
   events: (events) => post("/api/events", { events }),

@@ -13,7 +13,8 @@
     "dry-run": "wrangler deploy --dry-run",
     "check": "npm run types && npm run typecheck && npm run lint && npm test && npm run dry-run",
     "deploy": "wrangler deploy",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "history": "node scripts/history.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
