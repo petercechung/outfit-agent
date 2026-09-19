@@ -23,9 +23,17 @@ describe("fillLooks", () => {
     expect(looks.map((l) => l.items.map((i) => i.article_id))).toEqual([["d1", "s1"], ["d2", "s2"]]);
   });
 
-  it("drops a look when a piece has nothing left", () => {
+  it("drops a look when a piece it cannot do without has nothing left", () => {
     const one = res(hit("d1", 900, 0.9));
     expect(fillLooks(plan(2), [[one, res(hit("s1", 1, 1))], [one, res(hit("s2", 1, 1))]])).toHaveLength(1);
+  });
+
+  it("drops only the piece when the look can be worn without it (a bag nobody stocks)", () => {
+    const withBag = plan(1);
+    withBag.looks[0].pieces.push(piece("bag"));
+    const [look] = fillLooks(withBag, [[res(hit("d1", 900, 0.9)), res(hit("s1", 500, 0.9)), res()]]);
+    expect(look.items.map((i) => i.article_id)).toEqual(["d1", "s1"]);
+    expect(look.plan.pieces.map((p) => p.slot)).toEqual(["onepiece", "shoes"]); // still aligned with items
   });
 
   it("swaps in cheaper products until the look fits the budget, losing as little similarity as it can", () => {

@@ -46,7 +46,12 @@ export function eligibleRows(catalog: Catalog, q: SearchQuery): number[] {
 export function rankQuery(catalog: Catalog, q: SearchQuery, want: Float32Array, avoid: Float32Array[] = []): SearchResult {
   const photo = catalog.photo;
   if (!photo) return { hits: [], eligible: 0 };
-  const rows = eligibleRows(catalog, q);
+  // `types` is the stylist's guess at the catalogue's labels, and some labels are nearly empty (H&M files almost
+  // every bag as "Bag"; three women's items are "Cross-body bag"). When the guess matches nothing, the whole slot
+  // is searched and the photo decides. Filters that come from the person — colours, types, price — never relax.
+  let rows = eligibleRows(catalog, q);
+  const typesDropped = !rows.length && Boolean(q.types?.length);
+  if (typesDropped) rows = eligibleRows(catalog, { ...q, types: undefined });
   const scored = rows.map((i) => {
     const similarity = photoDot(photo, i, want);
     const pushAway = avoid.length ? Math.max(...avoid.map((a) => photoDot(photo, i, a))) : 0;
@@ -56,5 +61,5 @@ export function rankQuery(catalog: Catalog, q: SearchQuery, want: Float32Array, 
   const hits: SearchHit[] = scored.slice(0, q.limit).map(({ i, similarity }) => ({
     ...itemOf(catalog, i), similarity: Math.round(similarity * 1000) / 1000, matched_by: "photo",
   }));
-  return { hits, eligible: rows.length };
+  return { hits, eligible: rows.length, ...(typesDropped ? { types_dropped: true as const } : {}) };
 }

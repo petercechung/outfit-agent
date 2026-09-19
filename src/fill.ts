@@ -1,4 +1,5 @@
 // Filling planned looks with products — pure bookkeeping, no network, no judgement (see pipeline.ts).
+import { isComplete } from "./agents/stylist";
 import type { FilledLook, Piece, SearchQuery, SearchResult, StylistPlan } from "./contracts";
 
 const CANDIDATES_PER_PIECE = 8; // enough alternatives for distinct looks and budget swaps
@@ -29,9 +30,14 @@ export function fillLooks(plan: StylistPlan, results: SearchResult[][]): (Filled
   const used = new Set<string>();
   const budget = plan.constraints.budget_max_twd;
   const filled: (FilledLook & { over_budget: boolean })[] = [];
-  plan.looks.forEach((look, l) => {
-    const options = results[l].map((r) => r.hits.filter((h) => !used.has(h.article_id)));
-    if (options.some((o) => !o.length)) return; // a piece with nothing left: this look cannot be made
+  plan.looks.forEach((planned, l) => {
+    // A piece with nothing left (e.g. no bag passes the person's filters) is dropped; the look stays if it can
+    // still be worn. `look.pieces` and `items` stay index-aligned.
+    const found = results[l].map((r) => r.hits.filter((h) => !used.has(h.article_id)));
+    const keep = planned.pieces.map((_, p) => found[p].length > 0);
+    const look = { ...planned, pieces: planned.pieces.filter((_, p) => keep[p]) };
+    const options = found.filter((_, p) => keep[p]);
+    if (!isComplete(look.pieces)) return;
     const pick = options.map(() => 0);
     const total = () => pick.reduce((s, k, p) => s + options[p][k].price, 0);
     while (budget && total() > budget) {

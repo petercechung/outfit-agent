@@ -93,7 +93,9 @@ export function toV1Response(r: RecommendResult, sentence: string, lang: Lang, f
       body_type: null, height_cm: null, raw_text: sentence, parser: "openai", weather: null,
       assumptions: [r.understood].filter(Boolean),
     },
-    ask: r.kind === "outfit" && r.looks.length ? null : r.question, // shown instead of looks (public/js/views/search.js)
+    ask: r.kind === "outfit" && r.looks.length ? null
+      : r.critic === "skipped" ? tr(lang, r.question ?? "", "Nothing in the catalogue meets all of that. Could you relax one thing, like the colour, style or budget?")
+      : r.question, // shown instead of looks (public/js/views/search.js)
     outfits: r.looks.map((l) => outfitView(l, lang)),
     relaxed: {}, weather_policy: { band: null, outer: "none", label: "" }, candidate_counts: {}, personalized: false,
     closet_items: [], closet_options: { use_closet: false, warn_similar: false, pool_size: 0 },

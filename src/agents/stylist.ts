@@ -97,7 +97,8 @@ export function taiwanToday(now = Date.now()): string {
   return new Date(now + 8 * 3600e3).toISOString().slice(0, 10);
 }
 
-const isComplete = (pieces: Piece[]) => {
+/** A look someone can wear: shoes, and a top with a bottom or a one-piece. */
+export const isComplete = (pieces: Pick<Piece, "slot">[]) => {
   const slots = new Set(pieces.map((p) => p.slot));
   return slots.has("shoes") && (slots.has("onepiece") || (slots.has("top") && slots.has("bottom")));
 };

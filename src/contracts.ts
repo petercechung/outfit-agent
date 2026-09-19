@@ -45,6 +45,7 @@ export interface SearchHit extends Item {
 export interface SearchResult {
   hits: SearchHit[]; // best first, at most `limit`
   eligible: number; // items that passed the filters
+  types_dropped?: true; // `types` matched nothing that passes the other filters, so the whole slot was searched
 }
 
 // ---------------------------------------------------------------- ② stylist

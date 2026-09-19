@@ -32,6 +32,13 @@ const q = (extra: Partial<SearchQuery> = {}): SearchQuery => ({ slot: "top", tex
 const ids = (r: ReturnType<typeof rankQuery>) => r.hits.map((h) => h.article_id.slice(-1));
 
 describe("rankQuery", () => {
+  it("searches the whole slot when the stylist's type guess matches nothing, but never relaxes the person's filters", () => {
+    const r = rankQuery(fixture(), q({ types: ["Vest top"], avoid_colours: ["Black"] }), axis(0));
+    expect(r.types_dropped).toBe(true);
+    expect(ids(r)).toEqual(["0", "2"]); // no black, even after dropping the type
+    expect(rankQuery(fixture(), q({ types: ["Shirt"] }), axis(0)).types_dropped).toBeUndefined();
+  });
+
   it("ranks by how close the photo is to the request", () => {
     expect(ids(rankQuery(fixture(), q(), axis(0)))).toEqual(["0", "3", "1", "2"]);
   });

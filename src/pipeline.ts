@@ -36,7 +36,7 @@ export interface RecommendResult {
   looks: LookView[];
   problems: CriticVerdict["problems"];
   encoded_by: EncodedBy | null;
-  critic: "ok" | "unavailable";
+  critic: "ok" | "unavailable" | "skipped"; // skipped: no look could be made, so there was nothing to judge
   ms: { plan: number; search: number; judge: number; total: number };
   trace: { plan: StylistPlan; verdict: CriticVerdict | null }; // for the request history (src/history.ts)
 }
@@ -62,6 +62,14 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   const perLook = plan.looks.map((look) => look.pieces.map(() => results[k++]));
   const filled = withinBudget(fillLooks(plan, perLook));
   const tSearch = Date.now();
+  if (!filled.length) {
+    // Nothing the person asked for is in the catalogue. Say so instead of sending the critic an empty page.
+    return {
+      ...base, looks: [], problems: [], encoded_by: by, critic: "skipped", trace: { plan, verdict: null },
+      question: "目錄裡找不到符合這些條件的整套衣服。可以放寬一個條件嗎？例如顏色、款式或預算。",
+      ms: { plan: tPlan - t0, search: tSearch - tPlan, judge: 0, total: Date.now() - t0 },
+    };
+  }
 
   let verdict: CriticVerdict;
   let critic: RecommendResult["critic"] = "ok";
@@ -97,15 +105,17 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   const keep = verdict.keep.length ? verdict.keep : filled.slice(0, 3).map((l) => ({ id: l.id, reason: l.plan.idea }));
   // Other candidates the engine found for the same piece, for swapping one garment on the card.
   const shown = new Set(filled.flatMap((l) => l.items.map((i) => i.article_id)));
-  const alternatesFor = (id: string, p: number) =>
-    perLook[Number(id.slice(1)) - 1][p].hits.filter((h) => !shown.has(h.article_id)).slice(0, 4);
+  const alternatesFor = (id: string, piece: StylistPlan["looks"][number]["pieces"][number]) => {
+    const l = Number(id.slice(1)) - 1; // fill may have dropped pieces, so find this one in the original plan
+    return perLook[l][plan.looks[l].pieces.indexOf(piece)].hits.filter((h) => !shown.has(h.article_id)).slice(0, 4);
+  };
   const looks: LookView[] = keep.map(({ id, reason }) => {
     const look = filled.find((l) => l.id === id)!;
     return {
       id, title: look.plan.title, idea: look.plan.idea, reason, total_price: look.total_price,
       over_budget: Boolean(plan.constraints.budget_max_twd && look.total_price > plan.constraints.budget_max_twd),
       pieces: look.items.map((item, p) => ({
-        label: look.plan.pieces[p].label, why: look.plan.pieces[p].why, item, alternates: alternatesFor(id, p),
+        label: look.plan.pieces[p].label, why: look.plan.pieces[p].why, item, alternates: alternatesFor(id, look.plan.pieces[p]),
       })),
       revised: revised.get(id) ?? null,
     };
