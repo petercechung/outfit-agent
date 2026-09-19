@@ -3,7 +3,7 @@ import { EMBEDDING_DIM } from "../config";
 
 const API = "https://api.openai.com/v1";
 
-type Content = { type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "auto" };
+export type Content = { type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "auto" | "low" };
 type Input = string | { role: "user"; content: Content[] }[];
 
 function headers(env: Env) {

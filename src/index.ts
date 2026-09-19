@@ -4,8 +4,12 @@
 //   ② stylist  src/agents/   reads the sentence, decides what to wear, searches for concrete garments
 //   ③ critic   src/agents/   looks at the finished outfits against the original sentence
 import { HttpError, json, type RouteContext } from "./lib/http";
+import { encode } from "./routes/encode";
 import { health } from "./routes/health";
 import { thumbnail } from "./routes/media";
+import { plan } from "./routes/plan";
+import { recommend } from "./routes/recommend";
+import { search } from "./routes/search";
 
 interface Route {
   method: string;
@@ -17,7 +21,13 @@ interface Route {
 const ROUTES: Route[] = [
   { method: "GET", pattern: /^\/api\/health$/, handler: health },
   { method: "GET", pattern: /^\/thumbs\/(\d{10})\.jpg$/, handler: thumbnail },
+  { method: "POST", pattern: /^\/api\/encode$/, handler: encode, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/search$/, handler: search, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/plan$/, handler: plan, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/recommend$/, handler: recommend, needsOpenAI: true },
 ];
+
+export { FashionTextEncoder } from "./engine/encoder"; // the container class wrangler.jsonc binds
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {

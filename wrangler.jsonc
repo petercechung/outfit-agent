@@ -15,7 +15,16 @@
   "vars": {
     "OPENAI_MODEL": "gpt-5.4-mini",
     "OPENAI_REASONING_EFFORT": "low",
-    "OPENAI_EMBED_MODEL": "text-embedding-3-small"
+    "OPENAI_EMBED_MODEL": "text-embedding-3-small",
+    // Where the critic agent's model fetches product photos from; must be public, so not localhost in dev.
+    "IMAGE_ORIGIN": "https://stylist.cechung.com"
   },
+  // FashionCLIP's text encoder (encoder/), so sentences land in the same space as the product photos.
+  // standard-1 = 1/2 vCPU, 4 GiB: the model needs ~1 GiB; Docker must be running for `wrangler deploy`.
+  "containers": [
+    { "class_name": "FashionTextEncoder", "image": "./encoder/Dockerfile", "instance_type": "standard-1", "max_instances": 2 }
+  ],
+  "durable_objects": { "bindings": [{ "name": "TEXT_ENCODER", "class_name": "FashionTextEncoder" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FashionTextEncoder"] }],
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
