@@ -69,7 +69,24 @@ async function recommendStream(body, onEvent) {
   throw new Error("連線中斷，請再試一次");
 }
 
+/** The analyst agent's write-up of one look (src/routes/analyze.ts), streamed: onDelta sees each new piece of text. */
+async function analyzeStream(body, onDelta) {
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, ...who(), lang }),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    onDelta(value);
+  }
+}
+
 export const api = {
+  analyzeStream,
   /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
   recommend: (body) => post("/api/recommend", { ...body, ...who() }),
   recommendStream,

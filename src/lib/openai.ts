@@ -50,6 +50,31 @@ export async function structuredOutput<T>(
   return JSON.parse(text) as T;
 }
 
+/**
+ * A free-text answer, streamed: `onDelta` gets each new piece of text as it is written; returns the whole text.
+ * Used by the analyst agent, which writes for the person rather than for code.
+ */
+export async function streamText(
+  env: Env,
+  request: { name: string; input: Input; instructions: string; effort?: "none" | "low" | "medium" | "high"; onDelta: (text: string) => void },
+): Promise<string> {
+  const model = env.OPENAI_MODEL;
+  const res = await fetch(`${API}/responses`, {
+    method: "POST",
+    headers: headers(env),
+    body: JSON.stringify({
+      model, instructions: request.instructions, input: request.input, stream: true,
+      ...(isReasoningModel(model) ? { reasoning: { effort: request.effort ?? "medium" } } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenAI ${request.name} failed (${res.status})`);
+  let sent = 0;
+  return readStream(res, request.name, (soFar) => {
+    request.onDelta(soFar.slice(sent));
+    sent = soFar.length;
+  });
+}
+
 /** Reads a streamed response (server-sent events) and returns the full output text. */
 async function readStream(res: Response, name: string, onText: (soFar: string) => void): Promise<string> {
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();

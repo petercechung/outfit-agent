@@ -3,7 +3,9 @@
 //   ① engine   src/engine/   facts about the catalogue and a search over them
 //   ② stylist  src/agents/   reads the sentence, decides what to wear, searches for concrete garments
 //   ③ critic   src/agents/   looks at the finished outfits against the original sentence
+//   ④ analyst  src/agents/   after the looks are shown: a slower, streamed analysis of each one (prompt + trends)
 import { HttpError, json, type RouteContext } from "./lib/http";
+import { analyze } from "./routes/analyze";
 import { encode } from "./routes/encode";
 import { health } from "./routes/health";
 import { thumbnail } from "./routes/media";
@@ -27,6 +29,7 @@ const ROUTES: Route[] = [
   { method: "POST", pattern: /^\/api\/plan$/, handler: plan, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/recommend$/, handler: recommend, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/v2\/recommend$/, handler: recommendV2, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/analyze$/, handler: analyze, needsOpenAI: true },
   // Not rebuilt in v2: passed through to v1 (routes/proxy.ts).
   ...["GET", "POST", "DELETE"].map((method) => ({
     method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|verify|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,

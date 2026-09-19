@@ -102,6 +102,47 @@ function onProgress(event) {
   if (box) box.innerHTML = thinkingView();
 }
 
+/**
+ * ④ After the looks are on screen, the analyst agent takes its time over each one (the person's words, the photos,
+ * this week's fashion media) and its write-up streams into the card. Kept on the look, so re-renders keep it.
+ */
+function analysisView(look, k) {
+  const a = look.analysis;
+  if (!a) return `<div class="analysis" id="analysis-${k}" hidden></div>`; // filled in once the analyst starts
+  const body = a.text
+    ? esc(a.text.trim()).replace(/【(.+?)】|\[(.+?)\]/g, (_, zh, en) => `<b>${zh ?? en}</b> `).replace(/\n+/g, "<br>")
+    : `<span class="thinking-stage">${L("造型分析師正在仔細看這套…", "The analyst is taking a careful look…")}</span>`;
+  return `<div class="analysis" id="analysis-${k}">
+    <div class="label">${L("造型分析", "Analysis")}${a.done ? "" : ` <span class="muted">· ${L("思考中", "thinking")}</span>`}</div>
+    <p>${body}</p></div>`;
+}
+
+function analyseLook(k) {
+  const shownFor = result;
+  const look = result.outfits[k];
+  const intentReason = look.reasons.find((r) => r.group === "stylist" && r.key === "intent");
+  look.analysis = { text: "", done: false };
+  const redraw = () => {
+    const box = $(`#analysis-${k}`);
+    if (shownFor === result && box) box.outerHTML = analysisView(look, k);
+  };
+  redraw(); // show 「正在仔細看」 right away
+  api.analyzeStream({
+    sentence: result.intent.raw_text, title: look.theme?.label ?? "", idea: intentReason?.text ?? "",
+    article_ids: look.items.filter((i) => !i.owned).map((i) => i.article_id),
+  }, (delta) => {
+    look.analysis.text += delta;
+    redraw();
+  }).catch(() => {
+    look.analysis.text ||= L("分析暫時無法完成", "The analysis is unavailable right now");
+  }).finally(() => {
+    look.analysis.done = true;
+    redraw();
+  });
+}
+
+const analyseAll = () => result.outfits.forEach((_, k) => analyseLook(k));
+
 const startThinking = () => { thinking = { stage: "plan", stages: ["plan"], started: Date.now(), understood: "", looks: [] }; };
 
 const requestFields = () => ({ prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...(priority ? { priority } : {}) });
@@ -119,6 +160,7 @@ export async function runSearch(text = $("#q").value.trim()) {
     finishThinking(result.model);
     recordRound(result);
     render();
+    analyseAll();
   } catch (error) {
     thinking = null;
     thought = null;
@@ -156,6 +198,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     refining = false;
     thinking = null;
     render();
+    if (result.outfits.some((o) => !o.analysis)) analyseAll();
     $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
@@ -217,6 +260,7 @@ function lookCard(look, k) {
     </div>
     ${swatches ? swatchRow(swatches) : ""}
     ${lookSummary(look)}
+    ${analysisView(look, k)}
     <div class="total-row">
       <div class="icon-actions">
         <button class="icon-btn" ${attrs("look-like")} aria-label="${L("喜歡這套", "Like")}" aria-pressed="${pressed("like")}">${icon("heart")}</button>
@@ -282,6 +326,7 @@ function swapItem(look, j, alternate) {
   look.items[j] = { ...alternate, intent_pct: old.intent_pct, fit_note: null, alternates: [old, ...others] };
   look.total_price = look.items.reduce((sum, item) => sum + item.price, 0);
   render();
+  analyseLook(result.outfits.indexOf(look)); // a different outfit now: analyse it again
   toast(L("已替換，也記下你的選擇", "Swapped, and noted your choice"));
 }
 
