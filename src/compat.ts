@@ -26,6 +26,7 @@ export interface V1Request {
   stream?: boolean; // answer as a stream of progress lines (src/routes/recommend.ts)
   tester?: string; // who is testing, from a ?tester= link (src/history.ts)
   client_id?: string; // a random id this browser keeps
+  model?: string; // one of config.ts MODELS, from the page's model menu
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 

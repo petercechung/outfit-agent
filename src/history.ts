@@ -39,8 +39,8 @@ export async function recordRequest(
   const r = "result" in outcome ? outcome.result : null;
   await env.DB.prepare(
     `INSERT INTO requests (tester, client_id, country, user_agent, lang, turn, sentence, feedback, kind, understood,
-       question, budget_max_twd, looks, plan, verdict, encoded_by, critic, ms_plan, ms_search, ms_judge, ms_total, error)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       question, budget_max_twd, looks, plan, verdict, encoded_by, critic, ms_plan, ms_search, ms_judge, ms_total, error, model)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     asker.tester, asker.client_id, asker.country, asker.user_agent, asker.lang,
     turn.feedback === null ? "new" : "refine", turn.sentence, turn.feedback,
@@ -50,6 +50,7 @@ export async function recordRequest(
     r?.trace.verdict ? JSON.stringify(r.trace.verdict) : null,
     r?.encoded_by ?? null, r?.critic ?? null, r?.ms.plan ?? null, r?.ms.search ?? null, r?.ms.judge ?? null, r?.ms.total ?? null,
     "error" in outcome ? outcome.error.slice(0, 500) : null,
+    env.OPENAI_MODEL,
   ).run();
 }
 

@@ -2,14 +2,15 @@
 // POST /api/v2/recommend {text, context?} — the same pipeline, answered in v2's own shape (src/pipeline.ts).
 
 import { fromV1Request, toV1Response, type V1Request } from "../compat";
-import { LIMITS } from "../config";
+import { LIMITS, withModel } from "../config";
 import { askerOf, keepRecord } from "../history";
 import { HttpError, json, type RouteContext, readJson } from "../lib/http";
 import { recommend as run } from "../pipeline";
 import type { ProgressEvent } from "../progress";
 
-export async function recommend({ request, env, ctx }: RouteContext): Promise<Response> {
+export async function recommend({ request, env: baseEnv, ctx }: RouteContext): Promise<Response> {
   const body = await readJson<V1Request>(request, LIMITS.maxBodyBytes);
+  const env = withModel(baseEnv, body.model); // the model menu in the page header
   const { sentence, context, feedback, lang } = fromV1Request(body);
   if (!sentence) throw new HttpError(400, lang === "en" ? "Please describe what you need in a sentence" : "請輸入一句話描述你的需求");
   const text = sentence.slice(0, LIMITS.maxSentenceChars * 2);
@@ -23,7 +24,7 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
     try {
       const result = await run(env, text, context);
       keepRecord(ctx, env, asker, turn, { result });
-      return json(toV1Response(result, sentence, lang, feedback));
+      return json({ ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL });
     } catch (error) {
       failed(error);
       throw error;
@@ -38,7 +39,7 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
   const work = run(env, text, context, send)
     .then((result) => {
       keepRecord(ctx, env, asker, turn, { result });
-      return send({ type: "result", result: toV1Response(result, sentence, lang, feedback) });
+      return send({ type: "result", result: { ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL } });
     })
     .catch((error) => {
       failed(error);
@@ -51,8 +52,9 @@ export async function recommend({ request, env, ctx }: RouteContext): Promise<Re
   });
 }
 
-export async function recommendV2({ request, env, ctx }: RouteContext): Promise<Response> {
-  const body = await readJson<{ text?: unknown; context?: unknown; tester?: unknown; client_id?: unknown }>(request, LIMITS.maxBodyBytes);
+export async function recommendV2({ request, env: baseEnv, ctx }: RouteContext): Promise<Response> {
+  const body = await readJson<{ text?: unknown; context?: unknown; tester?: unknown; client_id?: unknown; model?: unknown }>(request, LIMITS.maxBodyBytes);
+  const env = withModel(baseEnv, body.model);
   if (typeof body.text !== "string" || !body.text.trim()) throw new HttpError(400, "text is required");
   const text = body.text.trim().slice(0, LIMITS.maxSentenceChars);
   const found = askerOf(request, body, "zh");

@@ -16,7 +16,7 @@ const rows = JSON.parse(out)[0].results;
 
 for (const r of rows.reverse()) {
   const who = r.tester ?? `browser ${String(r.client_id ?? "?").slice(0, 8)}`;
-  console.log(`\n#${r.id}  ${r.created_at}  ${who}  ${r.turn}${r.budget_max_twd ? `  budget NT$${r.budget_max_twd}` : ""}  ${r.ms_total ?? "-"} ms`);
+  console.log(`\n#${r.id}  ${r.created_at}  ${who}  ${r.turn}${r.budget_max_twd ? `  budget NT$${r.budget_max_twd}` : ""}  ${r.ms_total ?? "-"} ms  ${r.model ?? ""}`);
   console.log(`  「${r.sentence}」`);
   if (r.error) console.log(`  ERROR ${r.error}`);
   if (r.understood) console.log(`  understood: ${r.understood}`);

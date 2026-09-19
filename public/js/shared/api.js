@@ -15,7 +15,12 @@ export const tester = (() => {
   if (!clientId) keep("client_id", (clientId = crypto.randomUUID()));
   return { name: fromLink || read("tester"), client_id: clientId };
 })();
-const who = () => ({ tester: tester.name ?? undefined, client_id: tester.client_id });
+/** The model testers picked in the header menu (js/main.js); null = the server's default. */
+export const modelChoice = {
+  get: () => { try { return localStorage.getItem("model"); } catch { return null; } },
+  set: (m) => { try { localStorage.setItem("model", m); } catch { /* private mode: this visit only */ } },
+};
+const who = () => ({ tester: tester.name ?? undefined, client_id: tester.client_id, model: modelChoice.get() ?? undefined });
 
 async function request(method, path, body, headers = {}) {
   if (method === "GET") path += `${path.includes("?") ? "&" : "?"}lang=${lang}`;
@@ -68,6 +73,8 @@ export const api = {
   /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
   recommend: (body) => post("/api/recommend", { ...body, ...who() }),
   recommendStream,
+  /** -> {model, models, ...} what this deployment runs on (src/routes/health.ts) */
+  health: () => request("GET", "/api/health"),
   /** Anonymous feedback for 設計師洞察: [{article_id, action, occasion}] */
   events: (events) => post("/api/events", { events }),
   /** -> InsightsResponse (src/types.ts) */

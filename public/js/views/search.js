@@ -72,15 +72,15 @@ function thinkingView(t = thinking) {
     ${looks ? `<ol class="thinking-looks">${looks}</ol>` : ""}`;
   if (t === thinking) return `<div class="thinking" aria-live="polite">${plan}<p class="thinking-stage">${esc(STAGES[t.stage])}</p></div>`;
   return `<details class="thought-log">
-    <summary>${L(`造型師的思考過程 · ${t.seconds} 秒`, `How the stylist thought · ${t.seconds}s`)}</summary>
+    <summary>${L(`造型師的思考過程 · ${t.seconds} 秒`, `How the stylist thought · ${t.seconds}s`)}${t.model ? ` · ${esc(t.model)}` : ""}</summary>
     <div class="thinking">${plan}
       <ol class="thought-steps">${t.stages.map((s) => `<li>${esc(STAGES_DONE[s])}</li>`).join("")}</ol></div>
   </details>`;
 }
 
 /** The looks have arrived: keep the plan, folded. */
-function finishThinking() {
-  if (thinking?.understood || thinking?.looks.length) thought = { ...thinking, seconds: Math.round((Date.now() - thinking.started) / 1000) };
+function finishThinking(model) {
+  if (thinking?.understood || thinking?.looks.length) thought = { ...thinking, model, seconds: Math.round((Date.now() - thinking.started) / 1000) };
   thinking = null;
 }
 
@@ -116,7 +116,7 @@ export async function runSearch(text = $("#q").value.trim()) {
   $("#results").innerHTML = `<div id="thinking">${thinkingView()}</div>`;
   try {
     result = attachClosetPhotos(await api.recommendStream({ text, ...requestFields() }, onProgress));
-    finishThinking();
+    finishThinking(result.model);
     recordRound(result);
     render();
   } catch (error) {
@@ -146,7 +146,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     const signature = (r) => r.outfits.map((o) => o.items.map((i) => i.article_id).join()).sort().join("|");
     unchangedByFeedback = !regenerate && signature(next) === signature(result);
     result = attachClosetPhotos(next);
-    finishThinking();
+    finishThinking(result.model);
     recordRound(result);
     rating = null;
     chosenLook = null;
