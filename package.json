@@ -1,0 +1,25 @@
+{
+  "name": "outfit-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "一句穿搭 v2: a fact-only search engine, a stylist agent and a vision critic on Cloudflare Workers (梅竹黑客松 × 聚陽).",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --remote",
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "dry-run": "wrangler deploy --dry-run",
+    "check": "npm run types && npm run typecheck && npm run lint && npm test && npm run dry-run",
+    "deploy": "wrangler deploy",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^26.6.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.131.1"
+  }
+}

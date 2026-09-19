@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "outfit-agent",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/thumbs/*"]
+  },
+  "routes": [{ "pattern": "stylist.cechung.com", "custom_domain": true }],
+  // The catalogue, vectors and thumbnails are shared with v1 (outfit.cechung.com). v2 only reads them.
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "outfit-assets" }],
+  // OPENAI_API_KEY is a secret: `wrangler secret put OPENAI_API_KEY` (local dev: .dev.vars).
+  "vars": {
+    "OPENAI_MODEL": "gpt-5.4-mini",
+    "OPENAI_REASONING_EFFORT": "low",
+    "OPENAI_EMBED_MODEL": "text-embedding-3-small"
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
+}

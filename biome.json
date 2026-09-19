@@ -1,0 +1,32 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "test/**/*.ts",
+      "scripts/**/*.mjs",
+      "public/js/**/*.js",
+      "*.json",
+      "*.ts",
+      "!worker-configuration.d.ts",
+      "!package-lock.json"
+    ]
+  },
+  "formatter": {
+    "enabled": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": { "noForEach": "off" },
+      "performance": { "noAccumulatingSpread": "off" },
+      "style": { "useTemplate": "off", "noNonNullAssertion": "off" },
+      "suspicious": { "noAssignInExpressions": "off", "useIterableCallbackReturn": "off" }
+    }
+  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+}
