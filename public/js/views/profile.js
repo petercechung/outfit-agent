@@ -81,8 +81,8 @@ function render() {
       <details class="more-details"><summary class="label">${L("更多身材資訊（選填）", "More measurements (optional)")}</summary>
         <div class="form-grid">${MEASUREMENTS.map(([key, label]) => numberField(key, label)).join("")}</div>
       </details>
-      <p class="muted">${L("只存在這台裝置。性別與身形用在推薦（句子沒說時）、合身提醒，以及把身形相近的穿搭排在前面。",
-        "Stored only on this device. Gender and body shape are used for recommendations (when your sentence doesn't say), fit notes, and showing people with a similar build first.")}</p>
+      <p class="muted">${L("只存在這台裝置。身高與身形是穿搭牆相似排序的主要條件；體重有填時會輔助判斷。性別與身形也會用於推薦及合身提醒。",
+        "Stored only on this device. Height and body shape drive similar-build ranking; weight helps when provided. Gender and body shape also inform recommendations and fit notes.")}</p>
     </section>
     <section class="stack">${sectionTitle(L("個人風格檔案", "Style profile"))}
       ${styleProfileHtml()}

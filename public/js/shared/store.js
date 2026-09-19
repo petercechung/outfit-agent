@@ -27,12 +27,14 @@ function persist(key, value) {
 
 /** Sent with every search: liked/disliked article ids and per-attribute affinity ("colour:Pink": 2.5). */
 export const prefs = load("prefs", emptyPrefs());
-/** Height and body type the person chose to share; used for fit notes and 穿搭牆 ranking. */
+/** Body profile the person chose to share; used for fit notes and 穿搭牆 ranking. */
 export const profile = load("profile", { gender: null, height_cm: null, body_type: null });
-/** [{id, ts, text, note, wear, layout: {article_id: {x, y, r}}, items: [ItemView]}] */
+/** [{id, ts, text, note, wear, layout, kind, items: [ItemView]}] */
 export const journal = load("journal", []);
 /** [{id, name, slot, type, colour_master, colour, pattern, warmth, formality, gender, description, vec, image, ts}] */
 export const closet = load("closet", []);
+/** Free-arrangement positions for the draggable closet canvas. */
+export const wardrobeLayout = load("wardrobeLayout", {});
 /** [{id, delete_token, caption, created_at}] posts made from this browser */
 export const myPosts = load("myPosts", []);
 export const likedPosts = new Set(load("likedPosts", []));
@@ -48,6 +50,7 @@ export const rounds = load("rounds", []);
 export const saveProfile = () => persist("profile", profile);
 export const saveJournal = () => persist("journal", journal);
 export const saveCloset = () => persist("closet", closet);
+export const saveWardrobeLayout = () => persist("wardrobeLayout", wardrobeLayout);
 export const saveMyPosts = () => persist("myPosts", myPosts);
 export const saveLikedPosts = () => persist("likedPosts", [...likedPosts]);
 export const saveSettings = () => persist("settings", settings);

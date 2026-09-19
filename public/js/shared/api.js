@@ -88,9 +88,10 @@ export const api = {
   /** mode "closet" -> {garment, vec}; mode "inspo" -> {garments: [...matches], style_keywords} */
   analyzePhoto: (image, mode) => post("/api/photo", { image, mode }),
   feed: {
-    list({ sort, height_cm, body_type, offset = 0 }) {
+    list({ sort, height_cm, weight_kg, body_type, offset = 0 }) {
       const query = new URLSearchParams({ sort, offset: String(offset) });
       if (height_cm) query.set("height_cm", String(height_cm));
+      if (weight_kg) query.set("weight_kg", String(weight_kg));
       if (body_type) query.set("body_type", body_type);
       return request("GET", `/api/feed?${query}`);
     },

@@ -5,7 +5,7 @@ import { icon } from "../shared/icons.js";
 import { pickImageFile } from "../shared/images.js";
 import { closeSheet, openSheet } from "../shared/sheet.js";
 import { myPosts, profile, saveMyPosts, saveProfile } from "../shared/store.js";
-import { $, BODY_TYPE_NAME, formatPrice, OCCASION_NAME, options, toast } from "../shared/ui.js";
+import { $, BODY_TYPE_NAME, esc, formatPrice, OCCASION_NAME, options, toast } from "../shared/ui.js";
 
 let onPosted = () => {};
 
@@ -14,7 +14,7 @@ export function setOnPosted(callback) {
   onPosted = callback;
 }
 
-export function openComposer({ items = [], occasion = null } = {}) {
+export function openComposer({ items = [], occasion = null, initialImage = null, caption = "" } = {}) {
   const purchasable = items.filter((i) => !i.owned);
   const ownedNames = items.filter((i) => i.owned).map((i) => i.name);
   const total = purchasable.reduce((sum, item) => sum + item.price, 0);
@@ -36,14 +36,18 @@ export function openComposer({ items = [], occasion = null } = {}) {
       <p class="muted">拖曳照片調整位置。打開遮臉後，拖曳黑色方塊蓋住臉。</p>
     </div>
     <label class="field"><span class="label">說點什麼</span>
-      <textarea class="textarea" id="postCaption" maxlength="140" placeholder="例如：158cm 穿 M 剛好，裙長到膝上"></textarea></label>
+      <textarea class="textarea" id="postCaption" maxlength="140" placeholder="例如：158cm 穿 M 剛好，裙長到膝上">${esc(caption)}</textarea></label>
     <div class="form-grid">
       <label class="field"><span class="label">身高 (cm)</span>
         <input class="input" id="postHeight" type="number" inputmode="numeric" min="120" max="210" value="${profile.height_cm ?? ""}"></label>
-      <label class="field"><span class="label">體型</span>
+      <label class="field"><span class="label">體重（kg，選填）</span>
+        <input class="input" id="postWeight" type="number" inputmode="numeric" min="30" max="200" value="${profile.weight_kg ?? ""}"></label>
+      <label class="field"><span class="label">身形</span>
         <select class="select" id="postBody"><option value="">不提供</option>${options(BODY_TYPE_NAME, profile.body_type)}</select></label>
       <label class="field"><span class="label">場合</span>
         <select class="select" id="postOccasion"><option value="">不指定</option>${options(OCCASION_NAME, occasion)}</select></label>
+      <label class="field"><span class="label">季節</span>
+        <select class="select" id="postSeason"><option value="all">四季</option><option value="warm">春夏</option><option value="cool">秋冬</option></select></label>
     </div>
     ${purchasable.length ? `<div class="notice">會一起附上 ${purchasable.length} 件可購買單品（${formatPrice(total)}）${ownedNames.length ? `，以及你自己的 ${ownedNames.length} 件衣服` : ""}。</div>` : ""}
     <label class="check"><input type="checkbox" id="postConsent">
@@ -56,6 +60,8 @@ export function openComposer({ items = [], occasion = null } = {}) {
     if (!$("#postConsent").checked) return toast("發文前需要勾選同意公開");
     const heightValue = $("#postHeight").value;
     const height = heightValue ? Number(heightValue) : null;
+    const weightValue = $("#postWeight").value;
+    const weight = weightValue ? Number(weightValue) : null;
     const bodyType = $("#postBody").value || null;
     const button = $("#postSubmit");
     submitting = true;
@@ -63,8 +69,9 @@ export function openComposer({ items = [], occasion = null } = {}) {
     try {
       const caption = $("#postCaption").value.trim();
       const created = await api.feed.create({
-        image: cropper.exportJpeg(), caption, height_cm: height, body_type: bodyType,
-        occasion: $("#postOccasion").value || null, article_ids: purchasable.map((i) => i.article_id),
+        image: cropper.exportJpeg(), caption, height_cm: height, weight_kg: weight, body_type: bodyType,
+        occasion: $("#postOccasion").value || null, season: $("#postSeason").value,
+        article_ids: purchasable.map((i) => i.article_id),
         owned_items: ownedNames, consent: true,
       });
       myPosts.unshift({ id: created.id, delete_token: created.delete_token, caption, created_at: Date.now() });
@@ -72,8 +79,9 @@ export function openComposer({ items = [], occasion = null } = {}) {
       if (!profile.height_cm && height) {
         profile.height_cm = height;
         profile.body_type ??= bodyType;
-        saveProfile();
       }
+      if (!profile.weight_kg && weight) profile.weight_kg = weight;
+      saveProfile();
       closeSheet();
       toast("已發佈到穿搭牆");
       onPosted(created.id);
@@ -106,10 +114,19 @@ export function openComposer({ items = [], occasion = null } = {}) {
       },
       submit: () => submit(),
     },
-    onOpen: (body) => body.addEventListener("input", (event) => {
-      if (event.target.id === "cropZoom") cropper?.setZoom(Number(event.target.value) / 100);
-      if (event.target.id === "coverSize") cropper?.setCoverSize(Number(event.target.value) / 100);
-    }),
+    onOpen: async (body) => {
+      body.addEventListener("input", (event) => {
+        if (event.target.id === "cropZoom") cropper?.setZoom(Number(event.target.value) / 100);
+        if (event.target.id === "coverSize") cropper?.setCoverSize(Number(event.target.value) / 100);
+      });
+      if (!initialImage) return;
+      try {
+        cropper = await createCropper($("#cropper"), initialImage);
+        $("#cropControls").hidden = false;
+      } catch (error) {
+        toast(error.message);
+      }
+    },
     onClose: () => cropper?.destroy(),
   });
 }

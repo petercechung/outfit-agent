@@ -4,13 +4,14 @@ import { loadImage } from "./images.js";
 const OUTPUT_WIDTH = 900; // 3:4 → 900 × 1200
 const COVER_COLOUR = "#111111";
 
-export async function createCropper(container, file) {
-  const url = URL.createObjectURL(file);
+export async function createCropper(container, source) {
+  const isObjectUrl = typeof source !== "string";
+  const url = isObjectUrl ? URL.createObjectURL(source) : source;
   let img;
   try {
     img = await loadImage(url);
   } finally {
-    URL.revokeObjectURL(url);
+    if (isObjectUrl) URL.revokeObjectURL(url);
   }
   container.innerHTML = "<canvas></canvas>";
   const canvas = container.querySelector("canvas");
