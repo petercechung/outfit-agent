@@ -8,7 +8,10 @@ import type { LookPlan, Piece, RequestKind, StylistPlan } from "../contracts";
 import { COLOURS, PRODUCT_TYPES, SLOTS, type Slot, TYPES_BY_SLOT } from "../engine/vocabulary";
 import { structuredOutput } from "../lib/openai";
 
-const LOOKS_WANTED = "5 or 6";
+// Four looks: enough for the critic to keep three different ones. Measured on 「下週一面試」: six looks with an
+// avoid phrase on every piece took 13.3 s to plan and 48 phrases to embed; four looks with avoid only where
+// needed took 6.9 s (reasoning "none") with no loss in the looks.
+const LOOKS_WANTED = "4";
 
 const piece = {
   type: "object",
@@ -16,7 +19,7 @@ const piece = {
   properties: {
     slot: { type: "string", enum: SLOTS },
     search: { type: "string", description: "ONE garment in English, like a product page: fabric, cut, neckline, sleeves, length, colour, details. Style words are fine (\"a sweet feminine blouse with puff sleeves\"). Never a negation." },
-    avoid: { type: "array", items: { type: "string" }, description: "What this piece must NOT look like, each written positively (\"a top with thin spaghetti straps\"). Empty if nothing." },
+    avoid: { type: "array", items: { type: "string" }, description: "Usually EMPTY. Only when the person said to avoid something, or the occasion clearly rules something out: at most one phrase, written positively (\"a top with thin spaghetti straps\")." },
     types: { type: "array", items: { type: "string", enum: PRODUCT_TYPES }, description: "Catalogue types to restrict to when you are sure (e.g. [\"Coat\"], [\"Sandals\"]). Empty to allow any type in the slot." },
     label: { type: "string", description: "The same garment in the person's language, at most 12 characters." },
     why: { type: "string", description: "In the person's language, the reasoning from THEIR words to this garment. At most 40 characters." },
@@ -80,9 +83,10 @@ You decide what the situation needs. Reason from the place, the date and the sea
 of the year; Seoul in winter is freezing), from the occasion (an interview, a wedding, a concert) and from the style
 words they use. Nothing else in the system will add a coat, remove sandals or judge formality — you must.
 
-Write each garment the way a product page describes it. If they said what to avoid ("不要花紋", "不要太暴露"),
-write it in \`avoid\` as the thing itself ("a busy floral print", "a top with thin spaghetti straps"); never put
-"not" or "no" inside \`search\` — the search engine reads words, not negations.
+Write each garment the way a product page describes it, including its colour. Leave \`avoid\` empty unless
+they said what to avoid ("不要花紋", "不要太暴露") or the occasion clearly rules something out; then write the
+thing itself ("a busy floral print", "a top with thin spaghetti straps"). Never put "not" or "no" inside
+\`search\` — the search engine reads words, not negations.
 
 constraints: only what the person actually said. Gender: "men" only if they imply menswear; otherwise "women".`;
 }
@@ -113,7 +117,7 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
     }).map((p) => ({
       ...p,
       search: p.search.slice(0, 300),
-      avoid: (p.avoid ?? []).filter((a) => a?.trim()).slice(0, 3),
+      avoid: (p.avoid ?? []).filter((a) => a?.trim()).slice(0, 2),
       types: (p.types ?? []).filter((t) => TYPES_BY_SLOT[p.slot].includes(t)),
     }));
     return isComplete(pieces) ? [{ title: look.title, idea: look.idea, pieces }] : [];
@@ -140,6 +144,7 @@ export async function plan(env: Env, sentence: string, context = ""): Promise<St
     schema: SCHEMA,
     instructions: instructions(taiwanToday()),
     input: context ? `${context}\n\nThe person now says: ${sentence}` : sentence,
+    effort: "none", // the plan is long to write; thinking longer did not change the looks (8.0 s vs 6.9 s)
   });
   return tidyPlan(raw);
 }

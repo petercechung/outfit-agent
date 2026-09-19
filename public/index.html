@@ -1,17 +1,77 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>一句穿搭 v2</title>
-  <style>
-    :root { --bg: #faf8f5; --ink: #1c1c1c; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #161514; --ink: #eee; } }
-    body { margin: 0; padding: 48px 16px; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, sans-serif; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一句穿搭 · Outfit in a Sentence</title>
+<meta name="description" content="說一句話、拍一件衣服，或看看身形相近的人怎麼穿。整套可買、看得懂理由的穿搭推薦。"
+  data-en-content="Say one sentence and get complete, explained outfits from your own clothes and real products.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;display=swap">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/app.css">
+<script type="module" src="/js/main.js"></script>
 </head>
 <body>
-  <h1>一句穿搭 v2</h1>
-  <p>建置中。穩定版本在 <a href="https://outfit.cechung.com">outfit.cechung.com</a>。</p>
+<!-- Views are rendered by public/js/views/*.js. Clicks on [data-action] are routed in js/main.js.
+     Chinese is written here; data-en* attributes hold the English (js/shared/i18n.js). -->
+<header class="app-header">
+  <div class="app-header-inner">
+    <a class="brand" href="/">一句穿搭</a>
+    <nav class="tabs" id="tabs" aria-label="主要功能" data-en-aria="Main">
+      <button class="tab" data-tab="search" aria-current="page"><span data-icon="sparkle"></span><span data-en="Today">今天</span></button>
+      <button class="tab" data-tab="feed"><span data-icon="grid"></span><span data-en="Explore">穿搭牆</span></button>
+      <button class="tab" data-tab="journal"><span data-icon="bookmark"></span><span data-en="Journal">手帳</span></button>
+      <button class="tab" data-tab="profile"><span data-icon="hanger"></span><span data-en="Me">我的</span></button>
+    </nav>
+    <div class="header-links">
+      <button class="link-btn" data-action="open-insights" data-en="For designers">設計師洞察</button>
+      <button class="link-btn lang-btn" data-action="toggle-lang" aria-label="English" data-en-aria="中文" data-en="中文">EN</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 今天: say what the day is, get outfits — by sentence, or starting from your own clothes (人台). -->
+  <section id="tab-search" class="view">
+    <div class="hero">
+      <h1 class="display page-title" data-en="Today">今天</h1>
+      <p class="label" data-en="Tell me what today is. I'll decide what to wear.">告訴我今天要做什麼，我幫你決定怎麼穿</p>
+    </div>
+    <div class="segmented" id="todayModes">
+      <button data-action="today-mode" data-mode="sentence" aria-pressed="true" data-en="Describe it">說一句話</button>
+      <button data-action="today-mode" data-mode="mannequin" aria-pressed="false" data-en="Start from my clothes">從我的衣服搭</button>
+    </div>
+    <div id="sentencePane" class="stack">
+      <form class="search-bar" id="searchForm" role="search">
+        <input id="q" placeholder="這週六去台北看演唱會，想要韓系，預算 2500" autocomplete="off" aria-label="描述你的需求"
+          data-en-placeholder="Concert in Taipei on Saturday, K-style, budget NT$2,500" data-en-aria="Describe what you need">
+        <button class="icon-btn icon-btn-dark" aria-label="找穿搭" data-en-aria="Find outfits"><span data-icon="search"></span></button>
+      </form>
+      <div id="searchExtras"></div>
+      <div id="searchOptions"></div>
+      <p class="muted share-note" id="shareNote"></p>
+      <div class="chips" id="examples"></div>
+      <div id="results"></div>
+    </div>
+    <div id="mannequin" hidden></div>
+  </section>
+
+  <section id="tab-feed" class="view" hidden><div id="feed"></div></section>
+  <section id="tab-journal" class="view" hidden><div id="journal"></div></section>
+
+  <!-- 我的: the clothes I own, and me (body profile, options, what the system learnt). -->
+  <section id="tab-profile" class="view" hidden>
+    <div class="section-title"><h1 class="display page-title" data-en="Me">我的</h1></div>
+    <div id="wardrobe"></div>
+    <div id="profile"></div>
+  </section>
+
+  <section id="tab-insights" class="view" hidden><div id="insights"></div></section>
+</main>
+
+<div id="sheet" class="sheet" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

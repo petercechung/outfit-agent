@@ -1,0 +1,48 @@
+/*
+ * Theme tokens: "Editorial" (style 2: photo-first, black type, generous white space, one red accent).
+ * app.css only uses these variables, so restyling the whole site starts here.
+ */
+:root {
+  /* colour */
+  --ink: #111111;
+  --ink-2: #4a4a4a;
+  --ink-3: #8a8a8a;
+  --paper: #ffffff;
+  --wash: #f4f4f1;
+  --line: #e4e4e0;
+  --accent: #df2a1f;
+  --accent-ink: #ffffff;
+  --accent-soft: #fde9e7;
+  --good: #1f7a4b;
+  --good-soft: #e8f3ec;
+  --warn-soft: #fff3de;
+  --overlay: rgba(17, 17, 17, 0.45);
+
+  /* type */
+  --font-display: "Oswald", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 26px;
+  --text-hero: 44px;
+  --tracking-label: 0.14em;
+
+  /* shape and space */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --control-height: 48px;
+  --icon-button: 44px;
+  --content-width: 1080px;
+  --tabbar-height: 64px;
+  --shadow-float: 0 10px 30px rgba(17, 17, 17, 0.14);
+}

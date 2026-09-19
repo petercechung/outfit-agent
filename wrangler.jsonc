@@ -6,7 +6,7 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/thumbs/*"]
+    "run_worker_first": ["/api/*", "/thumbs/*", "/feed-images/*"]
   },
   "routes": [{ "pattern": "stylist.cechung.com", "custom_domain": true }],
   // The catalogue, vectors and thumbnails are shared with v1 (outfit.cechung.com). v2 only reads them.

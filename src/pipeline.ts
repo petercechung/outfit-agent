@@ -23,7 +23,7 @@ export interface LookView {
   reason: string; // the critic's, or the stylist's idea when the critic did not answer
   total_price: number;
   over_budget: boolean;
-  pieces: { label: string; why: string; item: SearchHit }[];
+  pieces: { label: string; why: string; item: SearchHit; alternates: SearchHit[] }[]; // alternates: "換一件"
   revised: { piece: number; why: string } | null;
 }
 
@@ -84,12 +84,18 @@ export async function recommend(env: Env, sentence: string, context = ""): Promi
   }
 
   const keep = verdict.keep.length ? verdict.keep : filled.slice(0, 3).map((l) => ({ id: l.id, reason: l.plan.idea }));
+  // Other candidates the engine found for the same piece, for swapping one garment on the card.
+  const shown = new Set(filled.flatMap((l) => l.items.map((i) => i.article_id)));
+  const alternatesFor = (id: string, p: number) =>
+    perLook[Number(id.slice(1)) - 1][p].hits.filter((h) => !shown.has(h.article_id)).slice(0, 4);
   const looks: LookView[] = keep.map(({ id, reason }) => {
     const look = filled.find((l) => l.id === id)!;
     return {
       id, title: look.plan.title, idea: look.plan.idea, reason, total_price: look.total_price,
       over_budget: Boolean(plan.constraints.budget_max_twd && look.total_price > plan.constraints.budget_max_twd),
-      pieces: look.items.map((item, p) => ({ label: look.plan.pieces[p].label, why: look.plan.pieces[p].why, item })),
+      pieces: look.items.map((item, p) => ({
+        label: look.plan.pieces[p].label, why: look.plan.pieces[p].why, item, alternates: alternatesFor(id, p),
+      })),
       revised: revised.get(id) ?? null,
     };
   });

@@ -1,0 +1,47 @@
+// Every call to the Worker API goes through here. Server error messages are written for users.
+// Every request carries the page language, so server-written texts (reasons, insights) match it.
+import { lang } from "./i18n.js";
+
+async function request(method, path, body, headers = {}) {
+  if (method === "GET") path += `${path.includes("?") ? "&" : "?"}lang=${lang}`;
+  else if (body) body = { ...body, lang };
+  const response = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json", ...headers } : headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `${response.status} ${response.statusText}`);
+  return data;
+}
+
+const post = (path, body = {}) => request("POST", path, body);
+
+export const api = {
+  /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
+  recommend: (body) => post("/api/recommend", body),
+  /** Anonymous feedback for 設計師洞察: [{article_id, action, occasion}] */
+  events: (events) => post("/api/events", { events }),
+  /** -> InsightsResponse (src/types.ts) */
+  insights: () => request("GET", "/api/insights"),
+  /** 即時流行趨勢 -> TrendSnapshot, or {snapshot: null} before the first collection */
+  trends: () => request("GET", "/api/trends"),
+  /** Collect now (the server ignores it if the snapshot is only minutes old) -> TrendSnapshot */
+  refreshTrends: () => post("/api/trends/refresh"),
+  /** Leave-one-out check of the person's own feedback log -> VerifyResponse */
+  verify: (events) => post("/api/verify", { events }),
+  /** mode "closet" -> {garment, vec}; mode "inspo" -> {garments: [...matches], style_keywords} */
+  analyzePhoto: (image, mode) => post("/api/photo", { image, mode }),
+  feed: {
+    list({ sort, height_cm, body_type, offset = 0 }) {
+      const query = new URLSearchParams({ sort, offset: String(offset) });
+      if (height_cm) query.set("height_cm", String(height_cm));
+      if (body_type) query.set("body_type", body_type);
+      return request("GET", `/api/feed?${query}`);
+    },
+    create: (postInput) => post("/api/feed", postInput),
+    like: (id) => post(`/api/feed/${encodeURIComponent(id)}/like`),
+    report: (id) => post(`/api/feed/${encodeURIComponent(id)}/report`),
+    remove: (id, deleteToken) => request("DELETE", `/api/feed/${encodeURIComponent(id)}`, null, { "x-delete-token": deleteToken }),
+  },
+};

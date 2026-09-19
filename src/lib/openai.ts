@@ -20,11 +20,14 @@ const isReasoningModel = (model: string) => /^(gpt-5|o[34])/.test(model);
 /** Calls the Responses API with a strict JSON schema and returns the parsed object. */
 export async function structuredOutput<T>(
   env: Env,
-  request: { name: string; schema: object; input: Input; instructions?: string; temperature?: number; model?: string },
+  request: {
+    name: string; schema: object; input: Input; instructions?: string; temperature?: number; model?: string;
+    effort?: "none" | "low" | "medium" | "high"; // reasoning models only; defaults to OPENAI_REASONING_EFFORT
+  },
 ): Promise<T> {
   const model = request.model ?? env.OPENAI_MODEL;
   const thinking = isReasoningModel(model)
-    ? { reasoning: { effort: env.OPENAI_REASONING_EFFORT || "low" } }
+    ? { reasoning: { effort: request.effort ?? (env.OPENAI_REASONING_EFFORT || "low") } }
     : request.temperature !== undefined ? { temperature: request.temperature } : {};
   const res = await fetch(`${API}/responses`, {
     method: "POST",

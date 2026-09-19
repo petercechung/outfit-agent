@@ -8,7 +8,8 @@ import { encode } from "./routes/encode";
 import { health } from "./routes/health";
 import { thumbnail } from "./routes/media";
 import { plan } from "./routes/plan";
-import { recommend } from "./routes/recommend";
+import { toV1 } from "./routes/proxy";
+import { recommend, recommendV2 } from "./routes/recommend";
 import { search } from "./routes/search";
 
 interface Route {
@@ -25,6 +26,11 @@ const ROUTES: Route[] = [
   { method: "POST", pattern: /^\/api\/search$/, handler: search, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/plan$/, handler: plan, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/recommend$/, handler: recommend, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/v2\/recommend$/, handler: recommendV2, needsOpenAI: true },
+  // Not rebuilt in v2: passed through to v1 (routes/proxy.ts).
+  ...["GET", "POST", "DELETE"].map((method) => ({
+    method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|verify|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,
+  })),
 ];
 
 export { FashionTextEncoder } from "./engine/encoder"; // the container class wrangler.jsonc binds
