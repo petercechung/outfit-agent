@@ -3,7 +3,8 @@ import { L } from "../shared/i18n.js";
 import { icon } from "../shared/icons.js";
 import { closetOptionsHtml, shareSignalsHtml } from "../shared/options.js";
 import {
-  myPosts, prefs, profile, removeFromStyleProfile, resetPrefs, saveProfile, styleProfile, styleProfileEmpty,
+  memoryFields, myPosts, prefs, profile, removeFromStyleProfile, resetPrefs, saveProfile, saveStyleMemory, styleProfile,
+  styleProfileEmpty,
 } from "../shared/store.js";
 import { $, BODY_TYPE_NAME, colourLabel, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
 import { removeMyPost } from "./feed.js";
@@ -84,6 +85,15 @@ function render() {
       <p class="muted">${L("只存在這台裝置。身高與身形是穿搭牆相似排序的主要條件；體重有填時會輔助判斷。性別與身形也會用於推薦及合身提醒。",
         "Stored only on this device. Height and body shape drive similar-build ranking; weight helps when provided. Gender and body shape also inform recommendations and fit notes.")}</p>
     </section>
+    <section class="stack">${sectionTitle(L("造型師記得的你", "What your stylist remembers"))}
+      <textarea class="input style-memory" id="styleMemory" rows="4" maxlength="600"
+        placeholder="${L("例如：偏好日系甜美但不要太幼稚，喜歡粉色和咖啡色，不穿黑色。上班要方便騎車。", "e.g. Soft Japanese style but not childish; love pink and brown, never black. I ride a scooter to work.")}"
+        aria-label="${L("造型師記得的你", "What your stylist remembers")}">${esc(memoryFields().memory)}</textarea>
+      <div class="button-row"><button class="btn btn-sm btn-primary" data-action="memory-save">${L("儲存", "Save")}</button>
+        <button class="btn btn-sm" data-action="memory-clear">${L("清空", "Clear")}</button></div>
+      <p class="muted">${L("造型師會在你說出長期喜好（例如「我不穿黑色」）或對穿搭按喜歡、不喜歡後，自己更新這段話；每次推薦都會參考它。你可以直接修改或刪掉任何一句。只存在這台裝置。",
+        "Your stylist updates this when you mention a lasting preference (\"I never wear black\") or react to looks, and reads it on every recommendation. Edit or delete anything. Stored only on this device.")}</p>
+    </section>
     <section class="stack">${sectionTitle(L("個人風格檔案", "Style profile"))}
       ${styleProfileHtml()}
       <p class="muted">${L("避開的顏色與款式不會再出現在推薦裡（除非你在那句話裡指定要）；喜歡的會優先。只存在這台裝置。",
@@ -119,6 +129,15 @@ function render() {
 }
 
 export const actions = {
+  "memory-save": () => {
+    saveStyleMemory($("#styleMemory").value);
+    toast(L("已儲存，下次推薦會參考", "Saved; your next recommendation will use it"));
+  },
+  "memory-clear": () => {
+    saveStyleMemory("");
+    render();
+    toast(L("已清空", "Cleared"));
+  },
   "style-remove": (data) => {
     removeFromStyleProfile(data.key, data.value);
     render();

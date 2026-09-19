@@ -13,6 +13,7 @@ import { loadCatalog } from "./engine/catalog";
 import type { EncodedBy } from "./engine/encoder";
 import { runSearches } from "./engine/run";
 import { fillLooks, queryFor, withinBudget } from "./fill";
+import type { Person } from "./person";
 import type { ProgressEvent } from "./progress";
 
 const REVISION_BEFORE_MS = 9000; // a revision costs another search; skip it once the request is this old
@@ -39,14 +40,19 @@ export interface RecommendResult {
   critic: "ok" | "unavailable" | "skipped"; // skipped: no look could be made, so there was nothing to judge
   ms: { plan: number; search: number; judge: number; total: number };
   trace: { plan: StylistPlan; verdict: CriticVerdict | null }; // for the request history (src/history.ts)
+  memory_update: string | null; // the stylist rewrote the person's style memory; the page saves it
 }
 
 /** `onEvent` (optional) hears the stylist's plan as it is written and each step as it starts. */
-export async function recommend(env: Env, sentence: string, context = "", onEvent?: (e: ProgressEvent) => void): Promise<RecommendResult> {
+export async function recommend(
+  env: Env, sentence: string, context = "", onEvent?: (e: ProgressEvent) => void, person?: Person,
+): Promise<RecommendResult> {
   const t0 = Date.now();
-  const plan = await stylistPlan(env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })));
+  const plan = await stylistPlan(env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })), person);
   const tPlan = Date.now();
-  const base = { kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints };
+  const base = {
+    kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints, memory_update: plan.memory,
+  };
   if (plan.kind !== "outfit") {
     return {
       ...base, looks: [], problems: [], encoded_by: null, critic: "ok",
@@ -75,7 +81,7 @@ export async function recommend(env: Env, sentence: string, context = "", onEven
   let critic: RecommendResult["critic"] = "ok";
   onEvent?.({ type: "stage", stage: "judge" });
   try {
-    verdict = await judge(env, sentence, filled);
+    verdict = await judge(env, sentence, filled, person);
   } catch (error) {
     console.warn("critic unavailable:", (error as Error).message);
     critic = "unavailable";

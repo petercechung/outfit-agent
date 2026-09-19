@@ -328,3 +328,4 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
   background: var(--wash); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--ink-2); }
 .analysis p { margin: 0; line-height: 1.7; }
 .analysis b { color: var(--ink); }
+.style-memory { min-height: 6em; resize: vertical; line-height: 1.6; font: inherit; padding: var(--space-3); }

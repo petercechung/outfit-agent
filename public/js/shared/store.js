@@ -135,8 +135,60 @@ function markHits(items) {
 }
 
 /** Updates the feedback profile from an action on catalog items. The person's own clothes are ignored. */
+// ---- 造型師記得的你: the style memory (src/person.ts). A paragraph the stylist agent keeps up to date and the
+// person can read and edit in 「我的」, like an assistant's memory. Stays in this browser; sent with each request.
+
+const REACTION_WORDS = { like: "喜歡", save: "收藏", buy: "買了", wear: "穿過", dislike: "不喜歡", swap_out: "換掉" };
+const MAX_REACTIONS = 20;
+
+/** null until the first request; then the paragraph (possibly edited by the person). */
+export let styleMemory = load("styleMemory", null);
+/** Reactions to looks since the stylist last saw them: ["不喜歡：Black Bag「Sara hobo bag」"]. */
+const reactions = load("memoryReactions", []);
+
+export function saveStyleMemory(text) {
+  styleMemory = text.trim();
+  persist("styleMemory", styleMemory);
+}
+
+/**
+ * The first memory, written from what earlier versions learnt (the style profile and the liked/disliked
+ * attributes), so nobody starts from nothing. The stylist rewrites it in its own words from then on.
+ */
+function seedMemory() {
+  const top = (sign) => Object.entries(prefs.attrs).filter(([, v]) => Math.sign(v) === sign && Math.abs(v) >= 1)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 4).map(([attr]) => attr.split(":")[1]);
+  const lines = [
+    styleProfile.colors_prefer.length ? `喜歡的顏色：${styleProfile.colors_prefer.join("、")}` : "",
+    styleProfile.colors_avoid.length ? `不要的顏色：${styleProfile.colors_avoid.join("、")}` : "",
+    styleProfile.types_prefer.length ? `喜歡的單品：${styleProfile.types_prefer.join("、")}` : "",
+    styleProfile.types_avoid.length ? `不要的單品：${styleProfile.types_avoid.join("、")}` : "",
+    top(1).length ? `常按喜歡：${top(1).join("、")}` : "",
+    top(-1).length ? `常按不喜歡：${top(-1).join("、")}` : "",
+  ].filter(Boolean);
+  return lines.join("。");
+}
+
+/** Sent with every recommendation and analysis. */
+export const memoryFields = () => ({ memory: styleMemory ?? seedMemory(), reactions: [...reactions], profile });
+
+/** After a recommendation: the stylist has seen the reactions; keep its rewritten memory if it wrote one. */
+export function afterRecommendation(memoryUpdate) {
+  reactions.length = 0;
+  persist("memoryReactions", reactions);
+  if (styleMemory === null) saveStyleMemory(seedMemory());
+  if (memoryUpdate && memoryUpdate !== styleMemory) {
+    saveStyleMemory(memoryUpdate);
+    return true;
+  }
+  return false;
+}
+
 export function recordFeedback(items, action) {
   applyFeedback(prefs, items, action);
+  for (const i of items.filter((x) => !x.owned)) reactions.push(`${REACTION_WORDS[action] ?? action}：${i.colour} ${i.type}「${i.name}」`);
+  reactions.splice(0, Math.max(0, reactions.length - MAX_REACTIONS));
+  persist("memoryReactions", reactions);
   persist("prefs", prefs);
   const catalogItems = items.filter((i) => !i.owned);
   feedbackLog.push(...catalogItems.map((i) => ({ article_id: i.article_id, action })));

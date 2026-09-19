@@ -7,6 +7,7 @@
 import type { LookPlan, Piece, RequestKind, StylistPlan } from "../contracts";
 import { COLOURS, PRODUCT_TYPES, SLOTS, type Slot, TYPES_BY_SLOT } from "../engine/vocabulary";
 import { structuredOutput } from "../lib/openai";
+import { describePerson, MEMORY_MAX_CHARS, type Person } from "../person";
 import { type Thought, thoughtStream } from "../progress";
 
 // Four looks: enough for the critic to keep three different ones. Measured on 「下週一面試」: six looks with an
@@ -59,8 +60,12 @@ const SCHEMA = {
         required: ["title", "idea", "pieces"],
       },
     },
+    memory: {
+      type: ["string", "null"],
+      description: "The person's style memory, rewritten in full, ONLY when this turn reveals a lasting preference; otherwise null.",
+    },
   },
-  required: ["kind", "question", "understood", "constraints", "looks"],
+  required: ["kind", "question", "understood", "constraints", "looks", "memory"],
 };
 
 function instructions(today: string): string {
@@ -89,7 +94,18 @@ they said what to avoid ("不要花紋", "不要太暴露") or the occasion clea
 thing itself ("a busy floral print", "a top with thin spaghetti straps"). Never put "not" or "no" inside
 \`search\` — the search engine reads words, not negations.
 
-constraints: only what the person actually said. Gender: "men" only if they imply menswear; otherwise "women".`;
+constraints: only what the person actually said. Gender: "men" only if they imply menswear; otherwise "women".
+
+You may be told what you remember about the person, their body and how they reacted to earlier looks. Use it the
+way a stylist who knows a client would — their favourite colours, what they never wear, what flatters their shape —
+unless today's sentence asks for something else (today's words always win).
+memory: keep a short paragraph about this person's lasting style, in their language, at most ${MEMORY_MAX_CHARS}
+characters. Rewrite it in full (keep what is still true, add what is new, drop what they contradicted) ONLY when this
+turn or their reactions show something lasting: "我不穿黑色", "我喜歡日系", repeatedly disliking leopard print.
+NOT memories: anything about this one request — "這次", "今天", "正式一點", a budget, an occasion or a place (a café,
+an interview, Seoul). If the only new thing is one of those, return null.
+Write short notes about their taste without a subject or pronoun ("不穿黑色，覺得太沉重。喜歡粉色。"), never "她"/"他"/
+"you", and never guesses about who they are.`;
 }
 
 /** The date in Taiwan, which is what "明天" and "這週六" mean to the person. */
@@ -136,6 +152,7 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
       avoid_types: (c.avoid_types ?? []).filter((x) => PRODUCT_TYPES.includes(x)),
     },
     looks: looks.slice(0, 6),
+    memory: typeof raw.memory === "string" && raw.memory.trim() ? raw.memory.trim().slice(0, MEMORY_MAX_CHARS) : null,
   };
 }
 
@@ -143,12 +160,15 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
  * One call to the model. `context` carries the previous looks and feedback on a refine turn. With `onThought`,
  * the plan is streamed and each readable field (what was understood, look titles, garments) is passed on as written.
  */
-export async function plan(env: Env, sentence: string, context = "", onThought?: (t: Thought) => void): Promise<StylistPlan> {
+export async function plan(
+  env: Env, sentence: string, context = "", onThought?: (t: Thought) => void, person?: Person,
+): Promise<StylistPlan> {
+  const about = person ? describePerson(person) : "";
   const raw = await structuredOutput<StylistPlan>(env, {
     name: "stylist_plan",
     schema: SCHEMA,
     instructions: instructions(taiwanToday()),
-    input: context ? `${context}\n\nThe person now says: ${sentence}` : sentence,
+    input: [about, context, context ? `The person now says: ${sentence}` : sentence].filter(Boolean).join("\n\n"),
     effort: "none", // the plan is long to write; thinking longer did not change the looks (8.0 s vs 6.9 s)
     onText: onThought && thoughtStream(onThought),
   });

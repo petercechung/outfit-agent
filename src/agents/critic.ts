@@ -4,6 +4,7 @@
 // really the same outfit. Like the stylist, its judgement lives in its instructions, not in code.
 import type { CriticVerdict, FilledLook } from "../contracts";
 import { type Content, structuredOutput } from "../lib/openai";
+import { describePerson, type Person } from "../person";
 
 const SCHEMA = {
   type: "object",
@@ -51,6 +52,8 @@ const INSTRUCTIONS = `You are a demanding fashion stylist reviewing outfits befo
 You get the client's own words and several outfits; each outfit shows the photo of every garment, numbered from 0.
 Judge from the PHOTOS, not the product names — a product called "shirt" may be a strappy camisole.
 
+If you are told about the client (their style memory, body, reactions), prefer outfits that suit them, unless their
+words today ask for something else.
 For each outfit ask: does every garment suit what the client said (the occasion, the weather at that place and
 date, the style words, anything they refused)? Do the pieces work together as one look?
 Keep the best three, best first, and make sure they are genuinely different from each other.
@@ -59,8 +62,9 @@ If one kept outfit would be right except for one garment, ask for that one garme
 If nothing answers the request well, keep what is closest and ask one question.`;
 
 /** Photos must be reachable by the model, so they are addressed on the public domain even during local dev. */
-export async function judge(env: Env, sentence: string, looks: FilledLook[]): Promise<CriticVerdict> {
-  const content: Content[] = [{ type: "input_text", text: `The client said: 「${sentence}」` }];
+export async function judge(env: Env, sentence: string, looks: FilledLook[], person?: Person): Promise<CriticVerdict> {
+  const about = person ? describePerson(person) : "";
+  const content: Content[] = [{ type: "input_text", text: `${about ? `${about}\n\n` : ""}The client said: 「${sentence}」` }];
   for (const look of looks) {
     content.push({ type: "input_text", text: `Outfit ${look.id} — ${look.plan.title}: ${look.plan.idea} (NT$${look.total_price})` });
     look.items.forEach((item, k) => {

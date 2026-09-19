@@ -3,6 +3,7 @@
 // short analysis for the person, streamed as it is written. Nothing it says changes the looks.
 import type { Item } from "../contracts";
 import { type Content, streamText } from "../lib/openai";
+import { describePerson, type Person } from "../person";
 
 export interface LookToAnalyse {
   title: string;
@@ -16,7 +17,8 @@ media are writing about this week. Look at the photos carefully; trust them over
 
 Write in the client's language (usually Traditional Chinese), plain text, exactly these four parts, each starting
 on its own line with the heading in brackets and 1–2 sentences after it:
-【對上你的需求】how this outfit answers what they said — point to specific garments.
+【對上你的需求】how this outfit answers what they said — point to specific garments. If you are told about them
+  (style memory, body), say how it suits THEM, e.g. their shape or a colour they love.
 【要注意】the one thing that might not work (fit for the occasion, weather, fabric, colours, comfort). If nothing, say so.
 【流行趨勢】how it relates to the trends listed, naming the source (e.g. Vogue Taiwan). Only use the trends given;
   if none relate or none are given, say that plainly. Never invent a trend or a source.
@@ -25,8 +27,12 @@ In English, use the headings [Fits your request], [Watch out], [Trends], [One tw
 At most 220 characters in total. No markdown, no lists.`;
 
 /** Streams the analysis through `onDelta`; resolves with the whole text. */
-export function analyse(env: Env, sentence: string, look: LookToAnalyse, trends: string, lang: string, onDelta: (t: string) => void): Promise<string> {
+export function analyse(
+  env: Env, sentence: string, look: LookToAnalyse, trends: string, lang: string, onDelta: (t: string) => void, person?: Person,
+): Promise<string> {
+  const about = person ? describePerson(person) : "";
   const content: Content[] = [
+    ...(about ? [{ type: "input_text" as const, text: about }] : []),
     { type: "input_text", text: `Client language: ${lang === "en" ? "English" : "Traditional Chinese"}\nThe client said: 「${sentence}」` },
     { type: "input_text", text: `Outfit 「${look.title}」 — the stylist's idea: ${look.idea}` },
   ];

@@ -7,11 +7,12 @@ import { loadCatalog } from "../engine/catalog";
 import { itemOf } from "../engine/search";
 import { askerOf } from "../history";
 import { HttpError, type RouteContext, readJson } from "../lib/http";
+import { describePerson, personFrom } from "../person";
 import { trendBrief } from "../trends";
 
 interface Body {
   sentence?: unknown; title?: unknown; idea?: unknown; article_ids?: unknown; lang?: unknown;
-  tester?: unknown; client_id?: unknown; model?: unknown;
+  tester?: unknown; client_id?: unknown; model?: unknown; memory?: unknown; profile?: unknown;
 }
 
 const text = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
@@ -29,17 +30,18 @@ export async function analyze({ request, env: baseEnv, ctx }: RouteContext): Pro
   if (!items.length) throw new HttpError(400, "unknown article_ids");
   const look = { title: text(body.title, 60), idea: text(body.idea, 300), items };
   const asker = askerOf(request, body, lang);
+  const person = personFrom(body);
 
   const { readable, writable } = new TransformStream<string, string>();
   const writer = writable.getWriter();
   const t0 = Date.now();
   const record = (written: string | null, error: string | null) =>
-    env.DB.prepare(`INSERT INTO analyses (tester, client_id, model, sentence, look_title, article_ids, text, ms, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(asker.tester, asker.client_id, env.OPENAI_MODEL, sentence, look.title,
-      JSON.stringify(items.map((i) => i.article_id)), written, Date.now() - t0, error).run()
+    env.DB.prepare(`INSERT INTO analyses (tester, client_id, model, sentence, look_title, article_ids, text, ms, error, person)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(asker.tester, asker.client_id, env.OPENAI_MODEL, sentence, look.title,
+      JSON.stringify(items.map((i) => i.article_id)), written, Date.now() - t0, error, describePerson(person) || null).run()
       .catch((e) => console.error("analysis write failed:", (e as Error).message));
   const work = trendBrief()
-    .then((trends) => analyse(env, sentence, look, trends, lang, (delta) => { writer.write(delta).catch(() => {}); }))
+    .then((trends) => analyse(env, sentence, look, trends, lang, (delta) => { writer.write(delta).catch(() => {}); }, person))
     .then((written) => record(written, null))
     .catch((error) => {
       console.error("analysis failed:", (error as Error).message);

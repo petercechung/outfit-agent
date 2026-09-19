@@ -27,6 +27,9 @@ export interface V1Request {
   tester?: string; // who is testing, from a ?tester= link (src/history.ts)
   client_id?: string; // a random id this browser keeps
   model?: string; // one of config.ts MODELS, from the page's model menu
+  memory?: string; // the person's style memory (src/person.ts), kept in their browser
+  reactions?: string[]; // their likes/dislikes on looks since the memory was last updated
+  profile?: unknown; // 我的資料: gender, height, body shape…
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 
@@ -102,6 +105,7 @@ export function toV1Response(r: RecommendResult, sentence: string, lang: Lang, f
     closet_items: [], closet_options: { use_closet: false, warn_similar: false, pool_size: 0 },
     coherence_source: "image", explored: false,
     applied_feedback: feedback ? [feedback] : [], profile_delta: null,
+    memory_update: r.memory_update, // the page saves it as the new style memory (「我的」)
     latency_ms: r.ms.total, ms: r.ms, encoded_by: r.encoded_by, critic: r.critic,
   };
 }

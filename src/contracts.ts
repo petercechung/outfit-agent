@@ -79,6 +79,7 @@ export interface StylistPlan {
     avoid_types: string[];
   };
   looks: LookPlan[]; // several different complete outfits when kind is "outfit"; empty otherwise
+  memory: string | null; // the person's style memory, rewritten when they revealed a lasting preference (src/person.ts)
 }
 
 // ---------------------------------------------------------------- ③ critic

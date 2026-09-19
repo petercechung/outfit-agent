@@ -10,7 +10,8 @@ import { lookBoard } from "../shared/lookboard.js";
 import { closetOptionsHtml } from "../shared/options.js";
 import { intentTiles, openItemSheet, productTile, reasonList, swatchRow } from "../shared/outfit.js";
 import {
-  attachClosetPhotos, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback, recordRound,
+  afterRecommendation, attachClosetPhotos, closetOptionFields, loopFields, memoryFields, prefs, profile, profileFields,
+  recordFeedback, recordRound,
   updateStyleProfile,
 } from "../shared/store.js";
 import { $, colourLabel, esc, formatPrice, notice, onTabOpen, toast } from "../shared/ui.js";
@@ -130,6 +131,7 @@ function analyseLook(k) {
   api.analyzeStream({
     sentence: result.intent.raw_text, title: look.theme?.label ?? "", idea: intentReason?.text ?? "",
     article_ids: look.items.filter((i) => !i.owned).map((i) => i.article_id),
+    memory: memoryFields().memory, profile,
   }, (delta) => {
     look.analysis.text += delta;
     redraw();
@@ -145,7 +147,14 @@ const analyseAll = () => result.outfits.forEach((_, k) => analyseLook(k));
 
 const startThinking = () => { thinking = { stage: "plan", stages: ["plan"], started: Date.now(), understood: "", looks: [] }; };
 
-const requestFields = () => ({ prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...(priority ? { priority } : {}) });
+const requestFields = () => ({
+  prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...memoryFields(), ...(priority ? { priority } : {}),
+});
+
+/** The stylist may have learnt something lasting: it is now in 「我的」 → 造型師記得的你. */
+function keepMemory(r) {
+  if (afterRecommendation(r.memory_update)) toast(L("造型師記住了你的喜好（可在「我的」查看與修改）", "Your stylist noted your taste (see Me to read or edit it)"));
+}
 
 export async function runSearch(text = $("#q").value.trim()) {
   if (!text) return;
@@ -158,6 +167,7 @@ export async function runSearch(text = $("#q").value.trim()) {
   try {
     result = attachClosetPhotos(await api.recommendStream({ text, ...requestFields() }, onProgress));
     finishThinking(result.model);
+    keepMemory(result);
     recordRound(result);
     render();
     analyseAll();
@@ -189,6 +199,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     unchangedByFeedback = !regenerate && signature(next) === signature(result);
     result = attachClosetPhotos(next);
     finishThinking(result.model);
+    keepMemory(result);
     recordRound(result);
     rating = null;
     chosenLook = null;
