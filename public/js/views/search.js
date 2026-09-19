@@ -43,7 +43,8 @@ let unchangedByFeedback = false; // the refined looks are the same as before (th
 let priority = null; // theme to put first, from the tapped tag
 let chosenLook = null; // index of the look the person picked with 「用這套」
 
-let thinking = null; // while waiting: {stage, understood, looks: [{title, idea, pieces: [{label, why}]}]}
+let thinking = null; // while waiting: {stage, stages, started, understood, looks: [{title, idea, pieces: [{label, why}]}]}
+let thought = null; // the same, kept after the looks arrive: shown folded above them, like a thinking log
 
 const STAGES = {
   plan: L("造型師正在讀你的話、構思整套…", "The stylist is reading your words and planning looks…"),
@@ -52,22 +53,42 @@ const STAGES = {
   revise: L("評審要換掉一件，重新找…", "The critic asked to replace one piece…"),
 };
 
-/** The stylist's plan as it streams in, then which step is running. */
-function thinkingView() {
-  if (!thinking) return "";
-  const looks = thinking.looks.map((look) => `<li class="thinking-look">
+/** Afterwards, each step as done. */
+const STAGES_DONE = {
+  plan: L("造型師規劃了上面這幾套", "The stylist planned the looks above"),
+  search: L("在商品照片裡找到每一件", "Found each garment among the product photos"),
+  judge: L("評審看過照片，挑出最後的幾套", "The critic looked at the photos and picked the final looks"),
+  revise: L("評審換掉了一件", "The critic replaced one piece"),
+};
+
+/** The stylist's plan: while it streams in (with the step running), or folded afterwards (with the steps done). */
+function thinkingView(t = thinking) {
+  if (!t) return "";
+  const looks = t.looks.map((look) => `<li class="thinking-look">
       <strong>${esc(look.title)}</strong>${look.idea ? ` <span class="muted">${esc(look.idea)}</span>` : ""}
       ${look.pieces.length ? `<ul>${look.pieces.map((p) => `<li>${esc(p.label)}${p.why ? `<span class="muted"> · ${esc(p.why)}</span>` : ""}</li>`).join("")}</ul>` : ""}
     </li>`).join("");
-  return `<div class="thinking" aria-live="polite">
-    ${thinking.understood ? `<p><span class="label">${L("我理解的是", "What I understood")}</span> ${esc(thinking.understood)}</p>` : ""}
-    ${looks ? `<ol class="thinking-looks">${looks}</ol>` : ""}
-    <p class="thinking-stage">${esc(STAGES[thinking.stage])}</p>
-  </div>`;
+  const plan = `${t.understood ? `<p><span class="label">${L("我理解的是", "What I understood")}</span> ${esc(t.understood)}</p>` : ""}
+    ${looks ? `<ol class="thinking-looks">${looks}</ol>` : ""}`;
+  if (t === thinking) return `<div class="thinking" aria-live="polite">${plan}<p class="thinking-stage">${esc(STAGES[t.stage])}</p></div>`;
+  return `<details class="thought-log">
+    <summary>${L(`造型師的思考過程 · ${t.seconds} 秒`, `How the stylist thought · ${t.seconds}s`)}</summary>
+    <div class="thinking">${plan}
+      <ol class="thought-steps">${t.stages.map((s) => `<li>${esc(STAGES_DONE[s])}</li>`).join("")}</ol></div>
+  </details>`;
+}
+
+/** The looks have arrived: keep the plan, folded. */
+function finishThinking() {
+  if (thinking?.understood || thinking?.looks.length) thought = { ...thinking, seconds: Math.round((Date.now() - thinking.started) / 1000) };
+  thinking = null;
 }
 
 function onProgress(event) {
-  if (event.type === "stage") thinking.stage = event.stage;
+  if (event.type === "stage") {
+    thinking.stage = event.stage;
+    thinking.stages.push(event.stage);
+  }
   else {
     const { key, value } = event.thought;
     const look = thinking.looks.at(-1);
@@ -81,7 +102,7 @@ function onProgress(event) {
   if (box) box.innerHTML = thinkingView();
 }
 
-const startThinking = () => { thinking = { stage: "plan", understood: "", looks: [] }; };
+const startThinking = () => { thinking = { stage: "plan", stages: ["plan"], started: Date.now(), understood: "", looks: [] }; };
 
 const requestFields = () => ({ prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...(priority ? { priority } : {}) });
 
@@ -95,11 +116,12 @@ export async function runSearch(text = $("#q").value.trim()) {
   $("#results").innerHTML = `<div id="thinking">${thinkingView()}</div>`;
   try {
     result = attachClosetPhotos(await api.recommendStream({ text, ...requestFields() }, onProgress));
-    thinking = null;
+    finishThinking();
     recordRound(result);
     render();
   } catch (error) {
     thinking = null;
+    thought = null;
     $("#results").innerHTML = notice(`${L("找不到穿搭：", "No outfits: ")}${error.message}`, "warn");
   }
 }
@@ -124,6 +146,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     const signature = (r) => r.outfits.map((o) => o.items.map((i) => i.article_id).join()).sort().join("|");
     unchangedByFeedback = !regenerate && signature(next) === signature(result);
     result = attachClosetPhotos(next);
+    finishThinking();
     recordRound(result);
     rating = null;
     chosenLook = null;
@@ -240,6 +263,7 @@ function render() {
       <div class="section-title"><h2 class="display">${L("系統聽懂的", "What we understood")}</h2><span class="rule"></span></div>
       ${intentTiles(intent)}
       <div class="assumptions">${notes.map((n) => `<span class="muted">${esc(n)}</span>`).join("")}</div>
+      ${thinkingView(thought)}
     </div>
     ${result.outfits.length
       ? `<div class="looks">${result.outfits.map(lookCard).join("")}</div>`
