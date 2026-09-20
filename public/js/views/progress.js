@@ -84,7 +84,8 @@ async function shop(persona, remember, onRound) {
   let memory = "";
   let reactions = [];
   for (let r = 0; r < LIVE.rounds; r++) {
-    const result = await api.recommend({ text: SENTENCES[r % SENTENCES.length], memory, reactions });
+    // A simulated shopper is not a customer: its requests must not reach the designers' demand data (src/signals.ts).
+    const result = await api.recommend({ text: SENTENCES[r % SENTENCES.length], memory, reactions, share_signals: false });
     const seen = react(persona, result);
     rates.push(seen.rate);
     if (remember) {

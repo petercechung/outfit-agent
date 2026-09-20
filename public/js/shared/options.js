@@ -9,7 +9,8 @@ const OPTIONS = [
   { key: "warnSimilar", label: L("提醒衣櫃已有類似的", "Warn me if I own something similar"), on: L("要買的單品如果衣櫃裡有很像的，會提醒你", "You'll be warned before buying something like what you own") },
 ];
 const SHARE = { key: "shareSignals", label: L("匿名分享我的需求給設計師", "Share my requests anonymously with designers"),
-  on: L("謝謝！你的需求會匿名幫助設計師開發新款", "Thanks! Your requests help designers, anonymously") };
+  on: L("謝謝！你的需求會匿名幫助設計師開發新款", "Thanks! Your requests help designers, anonymously"),
+  off: L("這次之後的搜尋都不會進入設計師洞察", "From now on your requests stay out of the designer insights") };
 
 /** The opt-out for anonymous signals (設計師洞察). On by default; nothing that identifies the person is sent. */
 export const shareSignalsHtml = () =>
@@ -31,6 +32,6 @@ export function init() {
     saveSettings();
     $$(`[data-setting="${key}"]`).forEach((box) => (box.checked = settings[key]));
     const option = [...OPTIONS, SHARE].find((o) => o.key === key);
-    toast(settings[key] ? option.on : L(`已關閉「${option.label}」`, `Turned off: ${option.label}`));
+    toast(settings[key] ? option.on : (option.off ?? L(`已關閉「${option.label}」`, `Turned off: ${option.label}`)));
   });
 }

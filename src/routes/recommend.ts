@@ -19,6 +19,9 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   const text = sentence.slice(0, LIMITS.maxSentenceChars * 2);
   const person = personFrom(body);
   const closet = closetFrom(body);
+  // A request that names a tester is ours (scripts, the ?tester= link, the simulated shoppers). It belongs in the
+  // development history, never in the designers' demand data — their numbers must be what real people asked for.
+  const shareDemand = body.share_signals !== false && !body.tester;
   const asker = { ...askerOf(request, body, lang), person: describePerson(person) }; // what the agents were told
   const turn = { sentence: text, feedback };
   const failed = (error: unknown) => {
@@ -29,7 +32,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
     try {
       const result = await run(env, text, context, undefined, person, closet);
       keepRecord(ctx, env, asker, turn, { result });
-      if (body.share_signals !== false) keepDemand(ctx, env, text, result);
+      if (shareDemand) keepDemand(ctx, env, text, result);
       return json({ ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL });
     } catch (error) {
       failed(error);
@@ -45,7 +48,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   const work = run(env, text, context, send, person, closet)
     .then((result) => {
       keepRecord(ctx, env, asker, turn, { result });
-      if (body.share_signals !== false) keepDemand(ctx, env, text, result);
+      if (shareDemand) keepDemand(ctx, env, text, result);
       return send({ type: "result", result: { ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL } });
     })
     .catch((error) => {
