@@ -1,7 +1,7 @@
 // Everything a person creates stays in their own browser (localStorage): feedback profile, body profile,
 // journal, closet, and the delete tokens of their 穿搭牆 posts. On the server: 穿搭牆 posts, and — unless the
 // person turns it off in 我的 — anonymous request and feedback signals for 設計師洞察 (see js/shared/signals.js).
-import { applyFeedback, emptyPrefs, POSITIVE_ACTIONS } from "./feedback.js";
+import { applyFeedback, emptyPrefs, POSITIVE_ACTIONS, undoFeedback } from "./feedback.js";
 import { queueEvents } from "./signals.js";
 
 const MAX_LOG = 300; // feedback actions kept for 進步驗證
@@ -196,6 +196,23 @@ export function recordFeedback(items, action) {
   persist("feedbackLog", feedbackLog);
   if (POSITIVE_ACTIONS.has(action)) markHits(catalogItems);
   if (settings.shareSignals) queueEvents(catalogItems.map((i) => ({ article_id: i.article_id, action, occasion: currentOccasion })));
+}
+
+/** Pressing 喜歡 or 不喜歡 again: the reaction is removed everywhere it was recorded. */
+export function unrecordFeedback(items, action) {
+  undoFeedback(prefs, items, action);
+  persist("prefs", prefs);
+  const ids = new Set(items.filter((i) => !i.owned).map((i) => i.article_id));
+  for (let k = feedbackLog.length - 1; k >= 0 && ids.size; k--) {
+    if (feedbackLog[k].action === action && ids.has(feedbackLog[k].article_id)) {
+      ids.delete(feedbackLog[k].article_id);
+      feedbackLog.splice(k, 1);
+    }
+  }
+  persist("feedbackLog", feedbackLog);
+  const names = new Set(items.map((i) => `「${i.name}」`));
+  for (let k = reactions.length - 1; k >= 0; k--) if ([...names].some((n) => reactions[k].endsWith(n))) reactions.splice(k, 1);
+  persist("memoryReactions", reactions);
 }
 
 export function resetPrefs() {

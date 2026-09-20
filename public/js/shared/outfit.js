@@ -1,7 +1,9 @@
 // Renderers shared by every view that shows clothes: product tiles, intent tiles, reasons, item details.
+
 import { L } from "./i18n.js";
 import { icon } from "./icons.js";
 import { closeSheet, openSheet } from "./sheet.js";
+import { prefs } from "./store.js";
 import { BODY_TYPE_NAME, COLOUR_NAME, colourLabel, esc, formatPrice, OCCASION_NAME, SLOT_NAME } from "./ui.js";
 
 const REASON_ICONS = { closet: "hanger", intent: "sparkle", occasion: "calendar", weather: "thermometer", harmony: "palette",
@@ -97,14 +99,16 @@ export function openItemSheet(item, { onLike, onDislike, onPickAlternate } = {})
         ${item.fit_note ? `<div class="notice notice-warn">${esc(item.fit_note)}</div>` : ""}
         ${item.desc ? `<p class="muted">${esc(item.desc)}</p>` : ""}
         ${onLike ? `<div class="button-row">
-          <button class="btn" data-action="sheet" data-handler="like">${icon("heart")}${L("喜歡", "Like")}</button>
-          <button class="btn" data-action="sheet" data-handler="dislike">${icon("heartOff")}${L("不喜歡", "Dislike")}</button></div>` : ""}
+          <button class="btn" data-action="sheet" data-handler="like" aria-pressed="${prefs.liked.includes(item.article_id)}">
+            ${icon("heart")}${prefs.liked.includes(item.article_id) ? L("已喜歡 ✓", "Liked ✓") : L("喜歡", "Like")}</button>
+          <button class="btn" data-action="sheet" data-handler="dislike" aria-pressed="${prefs.disliked.includes(item.article_id)}">
+            ${icon("heartOff")}${prefs.disliked.includes(item.article_id) ? L("已不喜歡 ✓", "Disliked ✓") : L("不喜歡", "Dislike")}</button></div>` : ""}
       </div>
       ${onPickAlternate && alternates.length ? `<div class="section-title"><h3 class="display">${L("換一件", "Swap for")}</h3><span class="rule"></span></div>
         <div class="products products-4">${alternates.map((a, n) => productTile(a, `data-action="sheet" data-handler="pick" data-index="${n}"`)).join("")}</div>` : ""}`,
     handlers: {
-      like: () => { onLike(); closeSheet(); },
-      dislike: () => { onDislike(); closeSheet(); },
+      like: () => { onLike(prefs.liked.includes(item.article_id)); closeSheet(); },
+      dislike: () => { onDislike(prefs.disliked.includes(item.article_id)); closeSheet(); },
       pick: (data) => { onPickAlternate(alternates[Number(data.index)]); closeSheet(); },
     },
   });

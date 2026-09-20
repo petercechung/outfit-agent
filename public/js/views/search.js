@@ -11,7 +11,7 @@ import { closetOptionsHtml } from "../shared/options.js";
 import { intentTiles, openItemSheet, productTile, reasonList, swatchRow } from "../shared/outfit.js";
 import {
   afterRecommendation, attachClosetPhotos, closetOptionFields, loopFields, memoryFields, prefs, profile, profileFields,
-  recordFeedback, recordRound,
+  recordFeedback, recordRound, unrecordFeedback,
   updateStyleProfile,
 } from "../shared/store.js";
 import { $, colourLabel, esc, formatPrice, notice, onTabOpen, toast } from "../shared/ui.js";
@@ -342,7 +342,15 @@ function swapItem(look, j, alternate) {
 }
 
 function rateLook(data, action) {
-  recordFeedback(result.outfits[data.look].items, action);
+  const look = result.outfits[data.look];
+  if (rating?.look === Number(data.look) && rating.action === action) { // pressed again: take it back
+    unrecordFeedback(look.items, action);
+    rating = null;
+    render();
+    return toast(L("已取消", "Undone"));
+  }
+  if (rating?.look === Number(data.look)) unrecordFeedback(look.items, rating.action); // changed their mind
+  recordFeedback(look.items, action);
   rating = { look: Number(data.look), action };
   render();
 }
@@ -376,8 +384,22 @@ export const actions = {
     const look = result.outfits[data.look];
     const item = look.items[data.item];
     openItemSheet(item, {
-      onLike: () => { recordFeedback([item], "like"); toast(L("記下了", "Noted")); },
-      onDislike: () => { recordFeedback([item], "dislike"); toast(L("之後會少推這種", "We'll show fewer like this")); },
+      onLike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "like");
+          return toast(L("已取消", "Undone"));
+        }
+        recordFeedback([item], "like");
+        toast(L("記下了", "Noted"));
+      },
+      onDislike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "dislike");
+          return toast(L("已取消", "Undone"));
+        }
+        recordFeedback([item], "dislike");
+        toast(L("之後會少推這種", "We'll show fewer like this"));
+      },
       onPickAlternate: (alternate) => swapItem(look, Number(data.item), alternate),
     });
   },

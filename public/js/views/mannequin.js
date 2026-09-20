@@ -8,8 +8,8 @@ import { closetOptionsHtml } from "../shared/options.js";
 import { openItemSheet, productTile, reasonList } from "../shared/outfit.js";
 import { closeSheet, openSheet } from "../shared/sheet.js";
 import {
-  attachClosetPhotos, closet, closetItemPayload, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback,
-  recordRound,
+  attachClosetPhotos, closet, closetItemPayload, closetOptionFields, loopFields, memoryFields, prefs, profile,
+  profileFields, recordFeedback, recordRound, unrecordFeedback,
 } from "../shared/store.js";
 import { $, esc, formatPrice, SLOT_NAME, toast } from "../shared/ui.js";
 import { openComposer } from "./composer.js";
@@ -126,7 +126,8 @@ export async function fill() {
     const placedIds = Object.values(placed);
     const closetItems = placedIds.map(closetItem).filter(Boolean).map(closetItemPayload);
     result = attachClosetPhotos(await api.recommend({
-      text: text.trim() || DEFAULT_TEXT, prefs, profile, closet_items: closetItems, ...closetOptionFields(placedIds), ...profileFields(), ...loopFields(),
+      text: text.trim() || DEFAULT_TEXT, prefs, profile, closet_items: closetItems,
+      ...closetOptionFields(placedIds), ...profileFields(), ...loopFields(), ...memoryFields(),
     }));
     recordRound(result);
     lookIndex = 0;
@@ -142,8 +143,22 @@ export async function fill() {
 function openRecommendedItem(item) {
   const look = currentLook();
   openItemSheet(item, {
-    onLike: () => { recordFeedback([item], "like"); toast("記下了"); },
-    onDislike: () => { recordFeedback([item], "dislike"); toast("之後會少推這種"); },
+    onLike: (already) => {
+      if (already) {
+        unrecordFeedback([item], "like");
+        return toast("已取消");
+      }
+      recordFeedback([item], "like");
+      toast("記下了");
+    },
+    onDislike: (already) => {
+      if (already) {
+        unrecordFeedback([item], "dislike");
+        return toast("已取消");
+      }
+      recordFeedback([item], "dislike");
+      toast("之後會少推這種");
+    },
     onPickAlternate: (alternate) => {
       const j = look.items.indexOf(item);
       recordFeedback([item], "swap_out");

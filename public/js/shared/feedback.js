@@ -11,6 +11,22 @@ export const emptyPrefs = () => ({ liked: [], disliked: [], attrs: {}, events: 0
 
 const attributesOf = (item) => [`colour:${item.colour_master}`, `type:${item.type}`, `pattern:${item.pattern}`];
 
+/** Takes back one action: the weights it added are subtracted and the item leaves the liked/disliked list. */
+export function undoFeedback(prefs, items, action) {
+  const weight = FEEDBACK_WEIGHTS[action];
+  for (const item of items.filter((i) => !i.owned)) {
+    for (const attr of attributesOf(item)) {
+      const left = Math.round(((prefs.attrs[attr] || 0) - weight) * 100) / 100;
+      if (left === 0) delete prefs.attrs[attr];
+      else prefs.attrs[attr] = left;
+    }
+    const list = weight > 0 ? "liked" : "disliked";
+    prefs[list] = prefs[list].filter((id) => id !== item.article_id);
+  }
+  prefs.events = Math.max(0, prefs.events - 1);
+  return prefs;
+}
+
 /** Applies one action on some items to `prefs` (mutated). The person's own clothes are ignored. */
 export function applyFeedback(prefs, items, action) {
   const weight = FEEDBACK_WEIGHTS[action];

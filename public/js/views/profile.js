@@ -2,8 +2,10 @@
 import { L } from "../shared/i18n.js";
 import { icon } from "../shared/icons.js";
 import { closetOptionsHtml, shareSignalsHtml } from "../shared/options.js";
+import { openItemSheet, productTile } from "../shared/outfit.js";
 import {
-  memoryFields, myPosts, prefs, profile, resetPrefs, saveProfile, saveStyleMemory,
+  journal, memoryFields, myPosts, prefs, profile, recordFeedback, resetPrefs, saveProfile, saveStyleMemory,
+  unrecordFeedback,
 } from "../shared/store.js";
 import { $, BODY_TYPE_NAME, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
 import { removeMyPost } from "./feed.js";
@@ -66,6 +68,9 @@ function render() {
       <p class="muted">${L("測試期間另外會完整記錄你輸入的句子、回饋和推薦結果（連同測試者名稱與這台瀏覽器的代號），供開發團隊檢查效果；這項紀錄無法在這裡關閉。",
         "While we test, your sentences, feedback and results are also recorded in full (with your tester name and this browser's id) so the team can check the results; this cannot be turned off here.")}</p>
     </section>
+    <section class="stack">${sectionTitle(L("我收藏的單品", "Items I saved"))}
+      ${savedItemsHtml()}
+    </section>
     <section class="stack">${sectionTitle(L("進步驗證", "Is it getting better?"))}
       ${progressSection()}
     </section>
@@ -79,7 +84,51 @@ function render() {
   </div>`;
 }
 
+/** Every product from the outfits saved to 手帳, newest first, each one only once. */
+function savedItems() {
+  const seen = new Set();
+  return journal.flatMap((page) => page.items ?? [])
+    .filter((item) => item.article_id && !item.owned && !item.whole_outfit && !seen.has(item.article_id) && seen.add(item.article_id));
+}
+
+function savedItemsHtml() {
+  const items = savedItems();
+  if (!items.length) {
+    return `<p class="muted">${L("還沒有收藏。在「今天」按「收藏」或「用這套」，整套的單品就會出現在這裡，也會存進手帳。",
+      "Nothing saved yet. Tap 收藏 or 用這套 on a look and its pieces appear here, and in your journal.")}</p>`;
+  }
+  return `<div class="products products-4">${items.map((item, k) =>
+      productTile(item, `data-action="saved-item" data-index="${k}"`, { pressed: prefs.liked.includes(item.article_id) })).join("")}</div>
+    <p class="muted">${L(`來自手帳裡收藏的 ${journal.length} 套穿搭。點一件可以看細節、按喜歡或取消。`,
+      `From the ${journal.length} outfits in your journal. Tap one for details, to like it or to undo.`)}</p>`;
+}
+
 export const actions = {
+  "saved-item": (data) => {
+    const item = savedItems()[Number(data.index)];
+    openItemSheet(item, {
+      onLike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "like");
+          toast(L("已取消", "Undone"));
+        } else {
+          recordFeedback([item], "like");
+          toast(L("記下了", "Noted"));
+        }
+        render();
+      },
+      onDislike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "dislike");
+          toast(L("已取消", "Undone"));
+        } else {
+          recordFeedback([item], "dislike");
+          toast(L("之後會少推這種", "We'll show fewer like this"));
+        }
+        render();
+      },
+    });
+  },
   "memory-save": () => {
     saveStyleMemory($("#styleMemory").value);
     toast(L("已儲存，下次推薦會參考", "Saved; your next recommendation will use it"));
