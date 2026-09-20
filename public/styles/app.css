@@ -274,7 +274,7 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
 .trend-latest a { color: inherit; }
 
 /* ---------------------------------------------------------------- header links: 設計師洞察, language */
-.header-links { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+.header-links { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2) var(--space-3); margin-left: auto; }
 .link-btn { border: 0; background: none; padding: var(--space-1) 0; font-size: var(--text-xs); color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .lang-btn { text-decoration: none; border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 2px var(--space-2); font-weight: 600; }
 @media (min-width: 700px) { .header-links { margin-left: var(--space-4); } }
@@ -321,7 +321,7 @@ input[type="range"] { width: 100%; accent-color: var(--ink); }
 .thought-log .thinking { padding: var(--space-3) 0 0; }
 .thought-steps { margin: 0; padding-left: var(--space-5); color: var(--ink-3); }
 .model-menu { border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 2px var(--space-2); background: var(--paper);
-  color: var(--ink); font: inherit; font-size: var(--text-xs); }
+  color: var(--ink); font: inherit; font-size: var(--text-xs); max-width: 40vw; }
 
 /* ④ 造型分析: the analyst agent's write-up, streamed into each look after it is shown (views/search.js). */
 .analysis { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-left: 3px solid var(--accent);

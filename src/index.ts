@@ -4,6 +4,8 @@
 //   ② stylist  src/agents/   reads the sentence, decides what to wear, searches for concrete garments
 //   ③ critic   src/agents/   looks at the finished outfits against the original sentence
 //   ④ analyst  src/agents/   after the looks are shown: a slower, streamed analysis of each one (prompt + trends)
+import { loadCatalog } from "./engine/catalog";
+import { encodeForPhotos } from "./engine/encoder";
 import { HttpError, json, type RouteContext } from "./lib/http";
 import { analyze } from "./routes/analyze";
 import { encode } from "./routes/encode";
@@ -38,7 +40,21 @@ const ROUTES: Route[] = [
 
 export { FashionTextEncoder } from "./engine/encoder"; // the container class wrangler.jsonc binds
 
+/**
+ * Keeps the FashionCLIP container awake (it sleeps after 30 minutes). A cold start takes longer than the encode
+ * timeout, so the first request after a quiet spell would fall back to the learned map; a demo should not.
+ */
+export async function warmEncoder(env: Env): Promise<void> {
+  const catalog = await loadCatalog(env);
+  const { by } = await encodeForPhotos(env, catalog, ["a white cotton shirt"]);
+  console.log("warm-up encoded by:", by);
+}
+
 export default {
+  async scheduled(_event, env, ctx): Promise<void> {
+    ctx.waitUntil(warmEncoder(env).catch((e) => console.error("warm-up failed:", (e as Error).message)));
+  },
+
   async fetch(request, env, ctx): Promise<Response> {
     const { pathname } = new URL(request.url);
     try {

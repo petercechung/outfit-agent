@@ -35,5 +35,7 @@
   ],
   "durable_objects": { "bindings": [{ "name": "TEXT_ENCODER", "class_name": "FashionTextEncoder" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FashionTextEncoder"] }],
+  // Every 20 minutes, keep the FashionCLIP container awake (src/index.ts warmEncoder); it sleeps after 30.
+  "triggers": { "crons": ["*/20 * * * *"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }

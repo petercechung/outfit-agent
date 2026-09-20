@@ -130,8 +130,8 @@ build_catalog.py        the curated catalogue (slot, gender, NT$ price) from the
 fetch_images.py         one thumbnail per article
 embed_catalog.py        caption vectors, OpenAI text-embedding-3-small, 256 dims, int8
 export_image_vectors.py photo vectors, FashionCLIP, 512 dims, int8
-fit_text_to_image.py    a 256×512 ridge map from caption space into photo space (the fallback when the
-                        container is cold; a text encoder is used when it is warm)
+fit_text_to_image.py    a 256×512 ridge map from caption space into photo space (in the v1 repo,
+                        MeiChu/outfit-site/pipeline/) — the fallback used while the container wakes
 export_site.py          packs all of the above into the files above, which are uploaded to R2
 ```
 
