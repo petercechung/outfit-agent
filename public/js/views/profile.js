@@ -4,10 +4,10 @@ import { icon } from "../shared/icons.js";
 import { closetOptionsHtml, shareSignalsHtml } from "../shared/options.js";
 import { openItemSheet, productTile } from "../shared/outfit.js";
 import {
-  journal, memoryFields, myPosts, prefs, profile, recordFeedback, resetPrefs, saveProfile, saveStyleMemory,
-  unrecordFeedback,
+  favourites, journal, memoryFields, memoryStats, myPosts, prefs, profile, recordFeedback, resetPrefs, rounds,
+  saveProfile, saveStyleMemory, unrecordFeedback,
 } from "../shared/store.js";
-import { $, BODY_TYPE_NAME, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
+import { $, BODY_TYPE_NAME, colourLabel, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
 import { removeMyPost } from "./feed.js";
 import { loadStudy, progressSection } from "./progress.js";
 import * as wardrobe from "./wardrobe.js";
@@ -25,6 +25,51 @@ const MEASUREMENTS = [
   ["sleeve_cm", L("袖長 (cm)", "Sleeve length (cm)"), 30, 90],
 ];
 const RANGES = { height_cm: [120, 210], ...Object.fromEntries(MEASUREMENTS.map(([key, , min, max]) => [key, [min, max]])) };
+
+/** One recorded attribute as words: 「粉色」「Dress」「花紋：Leopard」. */
+function attributeLabel(attr) {
+  const [kind, value] = attr.split(/:(.*)/s);
+  if (kind === "colour") return colourLabel(value);
+  if (kind === "pattern") return L(`花紋：${value}`, `Pattern: ${value}`);
+  return value;
+}
+
+/** The strongest scores, as bars. These exact numbers go to the stylist with every request (src/person.ts). */
+function bars(sign) {
+  const rows = Object.entries(prefs.attrs)
+    .filter(([, v]) => Math.sign(v) === sign && Math.abs(v) >= 1)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, 5);
+  if (!rows.length) return `<p class="muted">${L("尚無資料", "Nothing yet")}</p>`;
+  const max = Math.max(...rows.map(([, v]) => Math.abs(v)));
+  return rows.map(([attr, v]) => `<div class="hbar"><span>${esc(attributeLabel(attr))}</span>
+      <div class="bar ${v < 0 ? "neg" : ""}"><i style="width:${Math.round((Math.abs(v) / max) * 100)}%"></i></div>
+      <span class="muted">${v > 0 ? "+" : ""}${v.toFixed(1)}</span></div>`).join("");
+}
+
+/** What the fourth number counts: the person's most-liked colour and garment type. */
+function favouriteLabel() {
+  const top = favourites();
+  const names = [top.colour ? colourLabel(top.colour) : null, top.type].filter(Boolean).join(L("／", " / "));
+  return names
+    ? L(`最近幾次推薦裡是${names}的比例`, `of recent picks are ${names}`)
+    : L("最近幾次符合你的紀錄", "of recent picks match your record");
+}
+
+/** What the record adds up to: reactions, memory rewrites, and how well the last rounds matched it. */
+function memoryNumbers() {
+  const withMatch = rounds.filter((r) => typeof r.match === "number").slice(-5);
+  const mean = withMatch.length ? withMatch.reduce((s, r) => s + r.match, 0) / withMatch.length : null;
+  const scored = Object.values(prefs.attrs).filter((v) => Math.abs(v) >= 1).length;
+  const cells = [
+    [prefs.events, L("次回饋", "reactions")],
+    [scored, L("項偏好有分數", "attributes scored")],
+    [memoryStats.updates, L("次造型師更新記憶", "memory rewrites")],
+    [mean === null ? "—" : `${Math.round(mean * 100)}%`, favouriteLabel()],
+  ];
+  return `<div class="pref-numbers">${cells.map(([n, label]) =>
+    `<div><b>${esc(String(n))}</b><span class="muted">${label}</span></div>`).join("")}</div>`;
+}
 
 const sectionTitle = (title) => `<div class="section-title"><h2 class="display">${title}</h2><span class="rule"></span></div>`;
 const numberField = (key, label) => `<label class="field"><span class="label">${label}</span>
@@ -56,6 +101,13 @@ function render() {
         ${prefs.events ? `<button class="btn btn-sm" data-action="profile-reset-prefs">${L("清除回饋紀錄", "Clear my reactions")}</button>` : ""}</div>
       ${prefs.events ? `<p class="muted">${L(`你按過 ${prefs.events} 次喜歡／不喜歡／換掉，最近幾次會一起送給造型師，讓它更新上面這段話。`,
         `${prefs.events} reactions so far (likes, dislikes, swaps); the recent ones go to your stylist so it can update the paragraph above.`)}</p>` : ""}
+      ${memoryNumbers()}
+      ${prefs.events ? `<details class="more-details"><summary class="label">${L("我的回饋數據", "My reaction scores")}</summary>
+        <div class="pref-columns"><div class="stack"><div class="label">${L("常喜歡", "Often liked")}</div>${bars(1)}</div>
+          <div class="stack"><div class="label">${L("常不喜歡", "Often disliked")}</div>${bars(-1)}</div></div>
+        <p class="muted">${L("每按一次喜歡 +1、收藏 +1.5、買或穿過 +2、不喜歡 −1、換掉 −0.7，依顏色、款式、花紋累積。這些分數會連同上面那段話一起送給造型師。",
+          "Each tap scores the garment's colour, type and pattern: like +1, save +1.5, buy or wear +2, dislike −1, swapped out −0.7. These scores go to your stylist with the paragraph above.")}</p>
+      </details>` : ""}
       <p class="muted">${L("造型師會在你說出長期喜好（例如「我不穿黑色」）或對穿搭按喜歡、不喜歡後，自己更新這段話；每次推薦都會參考它。你可以直接修改或刪掉任何一句。只存在這台裝置。",
         "Your stylist updates this when you mention a lasting preference (\"I never wear black\") or react to looks, and reads it on every recommendation. Edit or delete anything. Stored only on this device.")}</p>
     </section>

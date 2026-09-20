@@ -18,10 +18,14 @@ function yourCurve() {
   const recent = rounds.slice(-10);
   if (recent.length < 2) return `<p class="muted">再搜尋並回饋幾次（按喜歡、存手帳），這裡會畫出你的命中率變化。</p>`;
   const rates = recent.map((r) => r.hits.length / r.looks.length);
+  const matches = recent.map((r) => (typeof r.match === "number" ? r.match : null));
   const firstHalf = rates.slice(0, Math.ceil(rates.length / 2));
   const secondHalf = rates.slice(Math.ceil(rates.length / 2));
   const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  return `${lineChart([{ label: "你喜歡或存下的 Look 比例", values: rates, tone: "ink" }])}
+  return `${lineChart([
+    { label: "你喜歡或存下的 Look 比例", values: rates, tone: "ink" },
+    ...(matches.some((m) => m !== null) ? [{ label: "是你最常喜歡的顏色／款式的比例", values: matches.map((m) => m ?? 0), tone: "accent" }] : []),
+  ])}
     <p class="muted">前半 ${pct(mean(firstHalf))} → 後半 ${pct(mean(secondHalf))}（最近 ${recent.length} 輪搜尋）</p>`;
 }
 

@@ -112,11 +112,32 @@ export const loopFields = () => ({ explore: true, share_signals: settings.shareS
 let currentOccasion = null; // occasion of the results on screen, attached to feedback for 設計師洞察
 
 /** Remembers a result the person was shown, for the learning curve in 進步驗證. */
+/** The colour and the garment type this person has pressed 喜歡 on most, if any stand out yet. */
+export function favourites() {
+  const best = (kind) => Object.entries(prefs.attrs)
+    .filter(([attr, v]) => attr.startsWith(`${kind}:`) && v >= 1)
+    .sort((a, b) => b[1] - a[1])[0]?.[0]
+    .split(":").slice(1).join(":");
+  return { colour: best("colour") ?? null, type: best("type") ?? null };
+}
+
+/**
+ * How much of one round is the person's favourite colour or favourite garment type — the two things they have
+ * pressed 喜歡 on most. Weaker preferences are left out on purpose: counting every colour they ever liked comes
+ * out at 100% every round and says nothing. Same record the agents read (src/person.ts).
+ */
+export function matchRate(items) {
+  const shown = items.filter((i) => !i.owned);
+  const top = favourites();
+  if (!shown.length || (!top.colour && !top.type)) return null;
+  return shown.filter((i) => i.colour_master === top.colour || i.type === top.type).length / shown.length;
+}
+
 export function recordRound(result) {
   currentOccasion = result.intent.occasion;
   const looks = result.outfits.map((o) => o.items.filter((i) => !i.owned).map((i) => i.article_id));
   if (!looks.length) return;
-  rounds.push({ ts: Date.now(), looks, hits: [] });
+  rounds.push({ ts: Date.now(), looks, hits: [], match: matchRate(result.outfits.flatMap((o) => o.items)) });
   rounds.splice(0, Math.max(0, rounds.length - MAX_ROUNDS));
   persist("rounds", rounds);
 }
@@ -146,9 +167,17 @@ export let styleMemory = load("styleMemory", null);
 /** Reactions to looks since the stylist last saw them: ["不喜歡：Black Bag「Sara hobo bag」"]. */
 const reactions = load("memoryReactions", []);
 
-export function saveStyleMemory(text) {
+/** How many times the stylist has rewritten the memory; shown in 我的 as evidence that it is learning. */
+export const memoryStats = load("memoryStats", { updates: 0, lastAt: null });
+
+export function saveStyleMemory(text, byStylist = false) {
   styleMemory = text.trim();
   persist("styleMemory", styleMemory);
+  if (byStylist) {
+    memoryStats.updates += 1;
+    memoryStats.lastAt = Date.now();
+    persist("memoryStats", memoryStats);
+  }
 }
 
 /**
@@ -178,7 +207,7 @@ export function afterRecommendation(memoryUpdate) {
   persist("memoryReactions", reactions);
   if (styleMemory === null) saveStyleMemory(seedMemory());
   if (memoryUpdate && memoryUpdate !== styleMemory) {
-    saveStyleMemory(memoryUpdate);
+    saveStyleMemory(memoryUpdate, true);
     return true;
   }
   return false;
