@@ -82,6 +82,9 @@ export interface StylistPlan {
   };
   looks: LookPlan[]; // several different complete outfits when kind is "outfit"; empty otherwise
   memory: string | null; // the person's style memory, rewritten when they revealed a lasting preference (src/person.ts)
+  // Labels for the designers' demand report only (src/signals.ts); no part of the recommendation uses them.
+  occasion: string | null;
+  style_keywords: string[];
 }
 
 // ---------------------------------------------------------------- ③ critic

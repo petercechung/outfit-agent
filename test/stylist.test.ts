@@ -3,7 +3,7 @@ import { taiwanToday, tidyPlan } from "../src/agents/stylist";
 import type { StylistPlan } from "../src/contracts";
 
 const base = (looks: StylistPlan["looks"], kind: StylistPlan["kind"] = "outfit"): StylistPlan => ({
-  kind, question: null, understood: "面試", looks, memory: null,
+  kind, question: null, understood: "面試", looks, memory: null, occasion: null, style_keywords: [],
   constraints: { gender: "women", budget_max_twd: null, avoid_colours: [], avoid_types: [] },
 });
 const p = (slot: string, extra = {}) => ({ slot, search: `a ${slot} in cotton`, label: slot, why: "因為", avoid: [], types: [], ...extra }) as never;

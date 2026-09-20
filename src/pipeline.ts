@@ -44,6 +44,7 @@ export interface RecommendResult {
   ms: { plan: number; search: number; judge: number; total: number };
   trace: { plan: StylistPlan; verdict: CriticVerdict | null }; // for the request history (src/history.ts)
   memory_update: string | null; // the stylist rewrote the person's style memory; the page saves it
+  signals: { occasion: string | null; style_keywords: string[] }; // labels for 設計師洞察 (src/signals.ts)
 }
 
 /** `onEvent` (optional) hears the stylist's plan as it is written and each step as it starts. */
@@ -58,6 +59,7 @@ export async function recommend(
   const tPlan = Date.now();
   const base = {
     kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints, memory_update: plan.memory,
+    signals: { occasion: plan.occasion, style_keywords: plan.style_keywords },
   };
   if (plan.kind !== "outfit") {
     return {

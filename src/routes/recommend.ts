@@ -7,6 +7,7 @@ import { LIMITS, withModel } from "../config";
 import { askerOf, keepRecord } from "../history";
 import { HttpError, json, type RouteContext, readJson } from "../lib/http";
 import { describePerson, personFrom } from "../person";
+import { keepDemand } from "../signals";
 import { recommend as run } from "../pipeline";
 import type { ProgressEvent } from "../progress";
 
@@ -28,6 +29,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
     try {
       const result = await run(env, text, context, undefined, person, closet);
       keepRecord(ctx, env, asker, turn, { result });
+      if (body.share_signals !== false) keepDemand(ctx, env, text, result);
       return json({ ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL });
     } catch (error) {
       failed(error);
@@ -43,6 +45,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   const work = run(env, text, context, send, person, closet)
     .then((result) => {
       keepRecord(ctx, env, asker, turn, { result });
+      if (body.share_signals !== false) keepDemand(ctx, env, text, result);
       return send({ type: "result", result: { ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL } });
     })
     .catch((error) => {

@@ -10,7 +10,7 @@ const hit = (id: string, price: number, similarity: number): SearchHit => ({
 const res = (...hits: SearchHit[]): SearchResult => ({ hits, eligible: hits.length });
 const piece = (slot: string) => ({ slot, search: slot, label: slot, why: "", avoid: [], types: [] }) as never;
 const plan = (looks: number, budget: number | null = null): StylistPlan => ({
-  kind: "outfit", question: null, understood: "", memory: null,
+  kind: "outfit", question: null, understood: "", memory: null, occasion: null, style_keywords: [],
   constraints: { gender: "women", budget_max_twd: budget, avoid_colours: [], avoid_types: [] },
   looks: Array.from({ length: looks }, (_, l) => ({ title: `T${l}`, idea: "", pieces: [piece("onepiece"), piece("shoes")] })),
 });

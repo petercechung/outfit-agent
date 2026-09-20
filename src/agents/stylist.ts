@@ -6,6 +6,7 @@
 // the catalogue's own vocabulary.
 import type { LookPlan, Piece, RequestKind, StylistPlan } from "../contracts";
 import { COLOURS, PRODUCT_TYPES, SLOTS, type Slot, TYPES_BY_SLOT } from "../engine/vocabulary";
+import { SIGNAL_OCCASIONS } from "../signals";
 import { structuredOutput } from "../lib/openai";
 import { describePerson, MEMORY_MAX_CHARS, type Person } from "../person";
 import { type Thought, thoughtStream } from "../progress";
@@ -61,12 +62,20 @@ const SCHEMA = {
         required: ["title", "idea", "pieces"],
       },
     },
+    occasion: {
+      type: ["string", "null"], enum: [...SIGNAL_OCCASIONS, null],
+      description: "For the brand's demand report only: which of these the request is for, or null if none fits.",
+    },
+    style_keywords: {
+      type: "array", items: { type: "string" },
+      description: "For the demand report only: the style words in the request, in their language (韓系, 極簡…). Empty if none.",
+    },
     memory: {
       type: ["string", "null"],
       description: "The person's style memory, rewritten in full, ONLY when this turn reveals a lasting preference; otherwise null.",
     },
   },
-  required: ["kind", "question", "understood", "constraints", "looks", "memory"],
+  required: ["kind", "question", "understood", "constraints", "looks", "occasion", "style_keywords", "memory"],
 };
 
 function instructions(today: string): string {
@@ -168,6 +177,8 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
     },
     looks: looks.slice(0, 6),
     memory: typeof raw.memory === "string" && raw.memory.trim() ? raw.memory.trim().slice(0, MEMORY_MAX_CHARS) : null,
+    occasion: (SIGNAL_OCCASIONS as readonly string[]).includes(raw.occasion ?? "") ? raw.occasion : null,
+    style_keywords: (raw.style_keywords ?? []).filter((k) => typeof k === "string" && k.trim()).map((k) => k.trim().slice(0, 20)).slice(0, 5),
   };
 }
 

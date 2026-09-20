@@ -12,10 +12,14 @@
   // The catalogue, vectors and thumbnails are shared with v1 (outfit.cechung.com). v2 only reads them.
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "outfit-assets" }],
   // v2's own database: the full history of every request while we test (src/history.ts). Not shared with v1.
-  "d1_databases": [{
-    "binding": "DB", "database_name": "outfit-agent-db", "database_id": "9ad75a20-c1c9-4f0d-96a2-8b42f7d0985c",
-    "migrations_dir": "migrations"
-  }],
+  "d1_databases": [
+    {
+      "binding": "DB", "database_name": "outfit-agent-db", "database_id": "9ad75a20-c1c9-4f0d-96a2-8b42f7d0985c",
+      "migrations_dir": "migrations"
+    },
+    // v1's database, for the anonymous demand signals 設計師洞察 reads (src/signals.ts). v2 only appends intents.
+    { "binding": "SIGNALS_DB", "database_name": "outfit-db", "database_id": "63982b0e-725e-479f-9ddf-51ea0e9bdfda" }
+  ],
   // OPENAI_API_KEY is a secret: `wrangler secret put OPENAI_API_KEY` (local dev: .dev.vars).
   "vars": {
     "OPENAI_MODEL": "gpt-5.4-mini",

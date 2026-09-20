@@ -33,6 +33,7 @@ export interface V1Request {
   closet_items?: unknown; // garments on the mannequin (從我的衣服搭)
   closet_pool?: unknown; // the rest of their wardrobe, when 優先用我的衣櫃 is on
   closet_options?: unknown; // {use_closet, warn_similar}
+  share_signals?: boolean; // 我的: may this request become an anonymous demand signal (src/signals.ts)
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 
