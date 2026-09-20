@@ -100,8 +100,6 @@ export const api = {
   trends: () => request("GET", "/api/trends"),
   /** Collect now (the server ignores it if the snapshot is only minutes old) -> TrendSnapshot */
   refreshTrends: () => post("/api/trends/refresh"),
-  /** Leave-one-out check of the person's own feedback log -> VerifyResponse */
-  verify: (events) => post("/api/verify", { events }),
   /** mode "closet" -> {garment, vec}; mode "inspo" -> {garments: [...matches], style_keywords} */
   analyzePhoto: (image, mode) => post("/api/photo", { image, mode }),
   feed: {

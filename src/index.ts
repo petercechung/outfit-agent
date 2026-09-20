@@ -32,7 +32,7 @@ const ROUTES: Route[] = [
   { method: "POST", pattern: /^\/api\/analyze$/, handler: analyze, needsOpenAI: true },
   // Not rebuilt in v2: passed through to v1 (routes/proxy.ts).
   ...["GET", "POST", "DELETE"].map((method) => ({
-    method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|verify|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,
+    method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,
   })),
 ];
 
