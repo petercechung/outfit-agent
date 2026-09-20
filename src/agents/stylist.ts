@@ -188,6 +188,7 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
  */
 export async function plan(
   env: Env, sentence: string, context = "", onThought?: (t: Thought) => void, person?: Person, closet = "",
+  onPartial?: (soFar: string) => void,
 ): Promise<StylistPlan> {
   const about = [person ? describePerson(person) : "", closet].filter(Boolean).join("\n\n");
   const raw = await structuredOutput<StylistPlan>(env, {
@@ -196,7 +197,12 @@ export async function plan(
     instructions: instructions(taiwanToday()),
     input: [about, context, context ? `The person now says: ${sentence}` : sentence].filter(Boolean).join("\n\n"),
     effort: "none", // the plan is long to write; thinking longer did not change the looks (8.0 s vs 6.9 s)
-    onText: onThought && thoughtStream(onThought),
+    onText: onThought || onPartial
+      ? ((thoughts) => (soFar: string) => {
+          thoughts?.(soFar);
+          onPartial?.(soFar);
+        })(onThought && thoughtStream(onThought))
+      : undefined,
   });
   return tidyPlan(raw);
 }

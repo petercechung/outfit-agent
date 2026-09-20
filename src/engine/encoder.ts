@@ -38,17 +38,40 @@ async function nativeEncode(env: Env, texts: string[]): Promise<Float32Array[]> 
 }
 
 /**
+ * Vectors already made, per Worker isolate. The pipeline encodes each garment while the stylist is still writing
+ * the rest of the plan (pipeline.ts), so by the time the search runs the work is usually done: the same text then
+ * costs nothing. Small and short-lived — a garment description is rarely asked for twice.
+ */
+const cache = new Map<string, { vector: Float32Array; by: EncodedBy }>();
+const CACHE_SIZE = 600;
+
+function remember(texts: string[], vectors: Float32Array[], by: EncodedBy) {
+  texts.forEach((text, k) => cache.set(text, { vector: vectors[k], by }));
+  for (const key of cache.keys()) {
+    if (cache.size <= CACHE_SIZE) break;
+    cache.delete(key); // Maps keep insertion order, so this is the oldest
+  }
+}
+
+/**
  * Unit vectors in the photo space for `texts`, and which way they were made. Throws only when neither way works
  * (no container answer and no learned map).
  */
 export async function encodeForPhotos(env: Env, catalog: Catalog, texts: string[]): Promise<{ vectors: Float32Array[]; by: EncodedBy }> {
-  try {
-    return { vectors: await nativeEncode(env, texts), by: "native" };
-  } catch (error) {
-    console.warn("native text encoder unavailable, using the learned map:", (error as Error).message);
+  const missing = [...new Set(texts.filter((t) => !cache.has(t)))];
+  let by: EncodedBy = "native";
+  if (missing.length) {
+    try {
+      remember(missing, await nativeEncode(env, missing), "native");
+    } catch (error) {
+      console.warn("native text encoder unavailable, using the learned map:", (error as Error).message);
+      if (!catalog.textToPhoto) throw new Error("no text encoder: the container did not answer and text_to_image.f32 is missing");
+      const w = catalog.textToPhoto;
+      const query = await embed(env, missing);
+      remember(missing, query.map((q) => mapToImage(q, w)), "map");
+    }
   }
-  if (!catalog.textToPhoto) throw new Error("no text encoder: the container did not answer and text_to_image.f32 is missing");
-  const w = catalog.textToPhoto;
-  const query = await embed(env, texts);
-  return { vectors: query.map((q) => mapToImage(q, w)), by: "map" };
+  const got = texts.map((t) => cache.get(t)!);
+  if (got.some((g) => g.by === "map")) by = "map"; // the answer is only as good as its weakest vector
+  return { vectors: got.map((g) => g.vector), by };
 }

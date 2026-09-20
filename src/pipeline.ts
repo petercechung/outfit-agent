@@ -13,10 +13,11 @@ import { EMBEDDING_DIM } from "./config";
 import type { CriticVerdict, SearchHit, StylistPlan } from "./contracts";
 import { loadCatalog } from "./engine/catalog";
 import type { EncodedBy } from "./engine/encoder";
+import { encodeForPhotos } from "./engine/encoder";
 import { runSearches } from "./engine/run";
 import { fillLooks, queryFor, withinBudget } from "./fill";
 import type { Person } from "./person";
-import type { ProgressEvent } from "./progress";
+import { type ProgressEvent, searchTextsIn } from "./progress";
 
 const REVISION_BEFORE_MS = 9000; // a revision costs another search; skip it once the request is this old
 
@@ -53,8 +54,21 @@ export async function recommend(
 ): Promise<RecommendResult> {
   const t0 = Date.now();
   const wardrobe = closet ? describeCloset(closet) : "";
+  // The catalogue and the garment vectors are wanted the moment the plan is ready, so both are started now:
+  // R2 loads while the stylist writes, and each garment is encoded as soon as its line of the plan is complete.
+  const catalogSoon = loadCatalog(env);
+  catalogSoon.catch(() => {}); // handled where it is awaited
+  let encoded = 0;
+  const warming: Promise<unknown>[] = [];
+  const encodeEarly = (soFar: string) => {
+    const texts = searchTextsIn(soFar);
+    if (texts.length <= encoded) return;
+    const fresh = texts.slice(encoded);
+    encoded = texts.length;
+    warming.push(catalogSoon.then((catalog) => encodeForPhotos(env, catalog, fresh)).catch(() => {}));
+  };
   const plan = await stylistPlan(
-    env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })), person, wardrobe,
+    env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })), person, wardrobe, encodeEarly,
   );
   const tPlan = Date.now();
   const base = {
@@ -69,7 +83,8 @@ export async function recommend(
   }
 
   onEvent?.({ type: "stage", stage: "search" });
-  const catalog = await loadCatalog(env);
+  const catalog = await catalogSoon;
+  await Promise.all(warming); // whatever was encoded early is already in the encoder's cache
   // A piece the stylist took from the person's own wardrobe needs no search: it is the one garment it can be.
   const ownById = new Map([...(closet?.placed ?? []), ...(closet?.pool ?? [])].map((i) => [i.id, i]));
   const own = (piece: { own?: string | null }) => (piece.own ? ownById.get(piece.own) : undefined);
