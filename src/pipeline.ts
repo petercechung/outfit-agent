@@ -145,7 +145,15 @@ export async function recommend(
     const row = catalog.idToRow.get(id);
     return row === undefined ? null : catalog.text.subarray(row * EMBEDDING_DIM, (row + 1) * EMBEDDING_DIM);
   };
-  const keep = verdict.keep.length ? verdict.keep : filled.slice(0, 3).map((l) => ({ id: l.id, reason: l.plan.idea }));
+  // Three looks is what the person is promised. If the critic ranked fewer, the rest follow in the order they were
+  // planned, each carrying whatever the critic said was wrong with it, so nothing is hidden.
+  const keep = [...verdict.keep];
+  for (const look of filled) {
+    if (keep.length >= 3) break;
+    if (keep.some((k) => k.id === look.id)) continue;
+    const problem = verdict.problems.find((p) => p.id === look.id);
+    keep.push({ id: look.id, reason: problem ? `評審的疑慮：${problem.problem}` : look.plan.idea });
+  }
   // Other candidates the engine found for the same piece, for swapping one garment on the card.
   const shown = new Set(filled.flatMap((l) => l.items.map((i) => i.article_id)));
   const alternatesFor = (id: string, piece: StylistPlan["looks"][number]["pieces"][number]) => {

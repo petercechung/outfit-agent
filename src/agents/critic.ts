@@ -58,8 +58,9 @@ Reject what cannot be worn together: a dress or jumpsuit with a skirt or trouser
 photo that is clearly not the garment the outfit says it is (planned as a bra top, the photo shows a dress).
 For each outfit ask: does every garment suit what the client said (the occasion, the weather at that place and
 date, the style words, anything they refused)? Do the pieces work together as one look?
-Keep THREE, best first — fewer only if you were given fewer, or if two are really the same outfit. Keeping the
-best three is your job even when none is perfect: say what is wrong in problems, and ask a question if it is bad.
+Keep THREE, best first — fewer ONLY if you were given fewer, or if two are really the same outfit. You are ranking,
+not filtering: an outfit with a fault still goes in the three if it is among the best three, with the fault in
+problems. If none is good, keep the three closest and ask one question.
 Reasons are for the client, in their language, and point to what you can see in the photos.
 If one kept outfit would be right except for one garment, ask for that one garment to be searched again.
 If nothing answers the request well, keep what is closest and ask one question.`;
