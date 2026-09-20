@@ -1,54 +1,14 @@
-// 我的: body profile, options, what the feedback profile has learnt, proof that it improves, and my posts.
+// 我的: the style memory the stylist keeps (造型師記得的你), body profile, options, proof that it improves, my posts.
 import { L } from "../shared/i18n.js";
 import { icon } from "../shared/icons.js";
 import { closetOptionsHtml, shareSignalsHtml } from "../shared/options.js";
 import {
-  memoryFields, myPosts, prefs, profile, removeFromStyleProfile, resetPrefs, saveProfile, saveStyleMemory, styleProfile,
-  styleProfileEmpty,
+  memoryFields, myPosts, prefs, profile, resetPrefs, saveProfile, saveStyleMemory,
 } from "../shared/store.js";
-import { $, BODY_TYPE_NAME, colourLabel, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
+import { $, BODY_TYPE_NAME, empty, esc, onTabOpen, options, toast } from "../shared/ui.js";
 import { removeMyPost } from "./feed.js";
 import { loadStudy, progressSection } from "./progress.js";
 import * as wardrobe from "./wardrobe.js";
-
-function attributeLabel(attr) {
-  const [kind, value] = attr.split(/:(.*)/s);
-  if (kind === "colour") return colourLabel(value);
-  if (kind === "pattern") return L(`花紋：${value}`, `Pattern: ${value}`);
-  return value;
-}
-
-function bars(sign) {
-  const rows = Object.entries(prefs.attrs)
-    .filter(([, v]) => Math.sign(v) === sign)
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    .slice(0, 6);
-  if (!rows.length) return `<p class="muted">${L("尚無資料", "Nothing yet")}</p>`;
-  const max = Math.max(...rows.map(([, v]) => Math.abs(v)));
-  return rows.map(([attr, v]) => `<div class="hbar"><span>${esc(attributeLabel(attr))}</span>
-      <div class="bar ${v < 0 ? "neg" : ""}"><i style="width:${Math.round((Math.abs(v) / max) * 100)}%"></i></div>
-      <span class="muted">${v.toFixed(1)}</span></div>`).join("");
-}
-
-const STYLE_GROUPS = [
-  ["colors_prefer", L("喜歡的顏色", "Colours I like"), colourLabel],
-  ["colors_avoid", L("避開的顏色", "Colours I avoid"), colourLabel],
-  ["types_prefer", L("喜歡的款式", "Pieces I like"), (t) => t],
-  ["types_avoid", L("避開的款式", "Pieces I avoid"), (t) => t],
-];
-
-/** 個人風格檔案: what the person has told us they like or avoid. Each entry can be removed. */
-function styleProfileHtml() {
-  if (styleProfileEmpty()) {
-    return `<p class="muted">${L("還是空的。在推薦結果按 ♡ 或 ✕ 再選「哪裡」，或回饋時說「我不穿黑色」，就會記在這裡。",
-      "Empty for now. Tap ♡ or ✕ on a look and pick what you mean, or say \"I never wear black\" in feedback.")}</p>`;
-  }
-  return STYLE_GROUPS.filter(([key]) => styleProfile[key].length).map(([key, label, format]) => `<div class="profile-row">
-      <span class="label">${label}</span>
-      <div class="chips">${styleProfile[key].map((value) =>
-        `<button class="chip" data-action="style-remove" data-key="${key}" data-value="${esc(value)}" aria-label="${L("移除", "Remove")} ${esc(format(value))}">${esc(format(value))} ×</button>`).join("")}</div>
-    </div>`).join("");
-}
 
 const GENDERS = L(
   { unspecified: "不指定", female: "女性", male: "男性", nonbinary: "無性別" },
@@ -90,14 +50,12 @@ function render() {
         placeholder="${L("例如：偏好日系甜美但不要太幼稚，喜歡粉色和咖啡色，不穿黑色。上班要方便騎車。", "e.g. Soft Japanese style but not childish; love pink and brown, never black. I ride a scooter to work.")}"
         aria-label="${L("造型師記得的你", "What your stylist remembers")}">${esc(memoryFields().memory)}</textarea>
       <div class="button-row"><button class="btn btn-sm btn-primary" data-action="memory-save">${L("儲存", "Save")}</button>
-        <button class="btn btn-sm" data-action="memory-clear">${L("清空", "Clear")}</button></div>
+        <button class="btn btn-sm" data-action="memory-clear">${L("清空", "Clear")}</button>
+        ${prefs.events ? `<button class="btn btn-sm" data-action="profile-reset-prefs">${L("清除回饋紀錄", "Clear my reactions")}</button>` : ""}</div>
+      ${prefs.events ? `<p class="muted">${L(`你按過 ${prefs.events} 次喜歡／不喜歡／換掉，最近幾次會一起送給造型師，讓它更新上面這段話。`,
+        `${prefs.events} reactions so far (likes, dislikes, swaps); the recent ones go to your stylist so it can update the paragraph above.`)}</p>` : ""}
       <p class="muted">${L("造型師會在你說出長期喜好（例如「我不穿黑色」）或對穿搭按喜歡、不喜歡後，自己更新這段話；每次推薦都會參考它。你可以直接修改或刪掉任何一句。只存在這台裝置。",
         "Your stylist updates this when you mention a lasting preference (\"I never wear black\") or react to looks, and reads it on every recommendation. Edit or delete anything. Stored only on this device.")}</p>
-    </section>
-    <section class="stack">${sectionTitle(L("個人風格檔案", "Style profile"))}
-      ${styleProfileHtml()}
-      <p class="muted">${L("避開的顏色與款式不會再出現在推薦裡（除非你在那句話裡指定要）；喜歡的會優先。只存在這台裝置。",
-        "Avoided colours and pieces won't be recommended (unless your sentence asks for them); liked ones come first. Stored only on this device.")}</p>
     </section>
     <section class="stack">${sectionTitle(L("推薦選項", "Recommendation options"))}
       ${closetOptionsHtml()}
@@ -107,13 +65,6 @@ function render() {
         "On by default. Only your request with personal details removed (phones, emails, names…) and your reactions to products are sent — no account, device or photos — and deleted after 30 days. Designers use it to decide what to make (see For designers).")}</p>
       <p class="muted">${L("測試期間另外會完整記錄你輸入的句子、回饋和推薦結果（連同測試者名稱與這台瀏覽器的代號），供開發團隊檢查效果；這項紀錄無法在這裡關閉。",
         "While we test, your sentences, feedback and results are also recorded in full (with your tester name and this browser's id) so the team can check the results; this cannot be turned off here.")}</p>
-    </section>
-    <section class="stack">${sectionTitle(L("系統學到的偏好", "What the system learnt"))}
-      <p class="muted">${L(`已累積 ${prefs.events} 次回饋（喜歡、不喜歡、換掉、收藏、購買、穿過），每次搜尋都會一起送出，用來重新排序推薦。`,
-        `${prefs.events} reactions so far (likes, dislikes, swaps, saves, purchases, wears). They're sent with every search to re-rank recommendations.`)}</p>
-      <div class="pref-columns"><div class="stack"><div class="label">${L("常喜歡", "Often liked")}</div>${bars(1)}</div>
-        <div class="stack"><div class="label">${L("常不喜歡", "Often disliked")}</div>${bars(-1)}</div></div>
-      <div><button class="btn btn-sm" data-action="profile-reset-prefs">${L("清除偏好", "Clear")}</button></div>
     </section>
     <section class="stack">${sectionTitle(L("進步驗證", "Is it getting better?"))}
       ${progressSection()}
@@ -137,10 +88,6 @@ export const actions = {
     saveStyleMemory("");
     render();
     toast(L("已清空", "Cleared"));
-  },
-  "style-remove": (data) => {
-    removeFromStyleProfile(data.key, data.value);
-    render();
   },
   "profile-reset-prefs": () => {
     resetPrefs();

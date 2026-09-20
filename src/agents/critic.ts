@@ -54,6 +54,8 @@ Judge from the PHOTOS, not the product names — a product called "shirt" may be
 
 If you are told about the client (their style memory, body, reactions), prefer outfits that suit them, unless their
 words today ask for something else.
+Reject what cannot be worn together: a dress or jumpsuit with a skirt or trousers, two of the same garment, or a
+photo that is clearly not the garment the outfit says it is (planned as a bra top, the photo shows a dress).
 For each outfit ask: does every garment suit what the client said (the occasion, the weather at that place and
 date, the style words, anything they refused)? Do the pieces work together as one look?
 Keep the best three, best first, and make sure they are genuinely different from each other.
