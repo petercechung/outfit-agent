@@ -1,5 +1,26 @@
 # 一句穿搭 v2 · stylist.cechung.com
 
+**Features**
+The app consists of four main pages:
+Today: Describe your needs in one sentence, and AI recommends multiple outfits with styling reasons.
+Outfit Wall: Browse other users’ outfit journals and find inspiration.
+Journal: Your own complete Junk Journal, where you can add photos.
+My Closet: Manage the clothes you actually own.
+**Today**
+The page is divided into two sections: Say It in One Sentence and Save My Clothes.
+**Say It in One Sentence**
+1.Say It in One Sentence:
+Enter your outfit needs in one sentence. The system converts natural language into structured styling criteria and generates 3 complete outfits with styling reasons and items that can be purchased directly. The first column displays the complete outfit on a model. Individual items are shown afterward, and similar or identical items are also recommended within each item section as alternatives.
+2.Closet Options (Off by Default):
+3.Prioritize My Closet: When generating outfits, prioritize clothes you already own.
+   Remind Me About Similar Items in My Closet: When you are about to purchase an item, the app will proactively remind you if you already own a similar piece.
+4.Find Similar Items from Photos:
+AI identifies each clothing item in a photo and finds the most similar, directly purchasable products in the database. You can then save them to your favorites.
+5.Feedback & Adjustments:
+After each recommendation, the app asks “What would you like to adjust?” You can provide feedback through quick-select options or by entering your own text.
+
+
+
 v2 of the one-sentence outfit recommender for the 2026 梅竹黑客松 × 聚陽實業 challenge. v1 (rule-based) stays live at
 [outfit.cechung.com](https://outfit.cechung.com) in `petercechung/MeiChu`.
 
