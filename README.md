@@ -157,6 +157,13 @@ curl -s https://stylist.cechung.com/api/v2/recommend \
   -d '{"text":"冬天去首爾玩五天"}' | jq '.looks[].pieces[].item.name'
 ```
 
+## Documents
+
+- [docs/DESIGN.md](docs/DESIGN.md) — how the search and the agents work, the data and tool licences, the
+  architecture decisions, every measurement and the limits.
+- [docs/TEAM.md](docs/TEAM.md) — who owns which part, and the working agreements.
+- [docs/DEMO.md](docs/DEMO.md) — the 2–3 minute demo script.
+
 ## Development history
 
 Every request while we test is recorded in `DB`: who (a tester name from a `?tester=` link, and a random browser
