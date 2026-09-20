@@ -25,6 +25,7 @@ export interface SearchQuery {
 
 /** One catalogue item, as the agents and the page see it. */
 export interface Item {
+  owned?: true; // one of the person's own clothes (src/closet.ts), not a product to buy
   article_id: string;
   name: string;
   type: string;
@@ -60,6 +61,7 @@ export interface Piece {
   why: string; // the reasoning from the person's words to this garment, in their language
   types?: string[]; // optional: restrict to these catalogue types when the stylist is sure (e.g. ["Coat"])
   avoid?: string[]; // what this piece must not look like, written positively ("a busy floral print")
+  own?: string | null; // id of one of the person's own garments (src/closet.ts) to wear instead of searching
 }
 
 export interface LookPlan {

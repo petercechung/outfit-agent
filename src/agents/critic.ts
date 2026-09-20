@@ -58,7 +58,8 @@ Reject what cannot be worn together: a dress or jumpsuit with a skirt or trouser
 photo that is clearly not the garment the outfit says it is (planned as a bra top, the photo shows a dress).
 For each outfit ask: does every garment suit what the client said (the occasion, the weather at that place and
 date, the style words, anything they refused)? Do the pieces work together as one look?
-Keep the best three, best first, and make sure they are genuinely different from each other.
+Keep THREE, best first — fewer only if you were given fewer, or if two are really the same outfit. Keeping the
+best three is your job even when none is perfect: say what is wrong in problems, and ask a question if it is bad.
 Reasons are for the client, in their language, and point to what you can see in the photos.
 If one kept outfit would be right except for one garment, ask for that one garment to be searched again.
 If nothing answers the request well, keep what is closest and ask one question.`;
@@ -70,8 +71,10 @@ export async function judge(env: Env, sentence: string, looks: FilledLook[], per
   for (const look of looks) {
     content.push({ type: "input_text", text: `Outfit ${look.id} — ${look.plan.title}: ${look.plan.idea} (NT$${look.total_price})` });
     look.items.forEach((item, k) => {
-      content.push({ type: "input_text", text: `${look.id} garment ${k} (${item.slot}): ${item.name}, ${item.type}, ${item.colour}, NT$${item.price}` });
-      content.push({ type: "input_image", image_url: `${env.IMAGE_ORIGIN}${item.image}`, detail: "low" });
+      // The person's own clothes stay in their browser: no photo, only what they told us about the garment.
+      const own = item.owned ? " — THE CLIENT'S OWN GARMENT, no photo: judge it from these words" : "";
+      content.push({ type: "input_text", text: `${look.id} garment ${k} (${item.slot}): ${item.name}, ${item.type}, ${item.colour}, ${item.owned ? "already theirs" : `NT$${item.price}`}${own}` });
+      if (!item.owned) content.push({ type: "input_image", image_url: `${env.IMAGE_ORIGIN}${item.image}`, detail: "low" });
     });
   }
   const verdict = await structuredOutput<CriticVerdict>(env, {

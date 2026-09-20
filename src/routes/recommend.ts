@@ -1,6 +1,7 @@
 // POST /api/recommend — what the page calls, in v1's request and response shape (src/compat.ts).
 // POST /api/v2/recommend {text, context?} — the same pipeline, answered in v2's own shape (src/pipeline.ts).
 
+import { closetFrom } from "../closet";
 import { fromV1Request, toV1Response, type V1Request } from "../compat";
 import { LIMITS, withModel } from "../config";
 import { askerOf, keepRecord } from "../history";
@@ -16,6 +17,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   if (!sentence) throw new HttpError(400, lang === "en" ? "Please describe what you need in a sentence" : "請輸入一句話描述你的需求");
   const text = sentence.slice(0, LIMITS.maxSentenceChars * 2);
   const person = personFrom(body);
+  const closet = closetFrom(body);
   const asker = { ...askerOf(request, body, lang), person: describePerson(person) }; // what the agents were told
   const turn = { sentence: text, feedback };
   const failed = (error: unknown) => {
@@ -24,7 +26,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   };
   if (!body.stream) {
     try {
-      const result = await run(env, text, context, undefined, person);
+      const result = await run(env, text, context, undefined, person, closet);
       keepRecord(ctx, env, asker, turn, { result });
       return json({ ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL });
     } catch (error) {
@@ -38,7 +40,7 @@ export async function recommend({ request, env: baseEnv, ctx }: RouteContext): P
   const writer = writable.getWriter();
   const send = (line: ProgressEvent | { type: "result"; result: unknown } | { type: "error"; error: string }) =>
     writer.write(`${JSON.stringify(line)}\n`).catch(() => {}); // the person may have left; the answer is simply dropped
-  const work = run(env, text, context, send, person)
+  const work = run(env, text, context, send, person, closet)
     .then((result) => {
       keepRecord(ctx, env, asker, turn, { result });
       return send({ type: "result", result: { ...toV1Response(result, sentence, lang, feedback), model: env.OPENAI_MODEL } });

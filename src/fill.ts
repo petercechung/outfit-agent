@@ -55,7 +55,7 @@ export function fillLooks(plan: StylistPlan, results: SearchResult[][]): (Filled
       pick[best.p] = best.k;
     }
     const items = pick.map((k, p) => options[p][k]);
-    items.forEach((i) => used.add(i.article_id));
+    items.filter((i) => !i.owned).forEach((i) => used.add(i.article_id)); // their own clothes may repeat across looks
     filled.push({ id: `L${l + 1}`, plan: look, items, total_price: total(), over_budget: Boolean(budget && total() > budget) });
   });
   return filled;

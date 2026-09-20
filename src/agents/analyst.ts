@@ -37,8 +37,9 @@ export function analyse(
     { type: "input_text", text: `Outfit 「${look.title}」 — the stylist's idea: ${look.idea}` },
   ];
   look.items.forEach((item, k) => {
-    content.push({ type: "input_text", text: `Garment ${k + 1} (${item.slot}): ${item.name}, ${item.type}, ${item.colour}, ${item.pattern}, NT$${item.price}. ${item.description.slice(0, 200)}` });
-    content.push({ type: "input_image", image_url: `${env.IMAGE_ORIGIN}${item.image}`, detail: "low" });
+    const own = item.owned ? " (the client's own garment, no photo)" : "";
+    content.push({ type: "input_text", text: `Garment ${k + 1} (${item.slot})${own}: ${item.name}, ${item.type}, ${item.colour}, ${item.pattern}, ${item.owned ? "already theirs" : `NT$${item.price}`}. ${item.description.slice(0, 200)}` });
+    if (!item.owned) content.push({ type: "input_image", image_url: `${env.IMAGE_ORIGIN}${item.image}`, detail: "low" });
   });
   content.push({ type: "input_text", text: trends || "No trend data is available right now." });
   return streamText(env, { name: "look_analysis", instructions: INSTRUCTIONS, input: [{ role: "user", content }], effort: "medium", onDelta });

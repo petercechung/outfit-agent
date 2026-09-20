@@ -8,6 +8,8 @@
 // No step here decides what suits what. Filling is bookkeeping; the judgements are the agents'.
 import { judge } from "./agents/critic";
 import { plan as stylistPlan } from "./agents/stylist";
+import { type Closet, describeCloset, ownedItem, similarOwned } from "./closet";
+import { EMBEDDING_DIM } from "./config";
 import type { CriticVerdict, SearchHit, StylistPlan } from "./contracts";
 import { loadCatalog } from "./engine/catalog";
 import type { EncodedBy } from "./engine/encoder";
@@ -25,7 +27,8 @@ export interface LookView {
   reason: string; // the critic's, or the stylist's idea when the critic did not answer
   total_price: number;
   over_budget: boolean;
-  pieces: { label: string; why: string; item: SearchHit; alternates: SearchHit[] }[]; // alternates: "換一件"
+  // `similar`: they already own the same type in the same colour (「衣櫃已有類似的」)
+  pieces: { label: string; why: string; item: SearchHit; alternates: SearchHit[]; similar: { id: string; name: string } | null }[];
   revised: { piece: number; why: string } | null;
 }
 
@@ -45,10 +48,13 @@ export interface RecommendResult {
 
 /** `onEvent` (optional) hears the stylist's plan as it is written and each step as it starts. */
 export async function recommend(
-  env: Env, sentence: string, context = "", onEvent?: (e: ProgressEvent) => void, person?: Person,
+  env: Env, sentence: string, context = "", onEvent?: (e: ProgressEvent) => void, person?: Person, closet?: Closet,
 ): Promise<RecommendResult> {
   const t0 = Date.now();
-  const plan = await stylistPlan(env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })), person);
+  const wardrobe = closet ? describeCloset(closet) : "";
+  const plan = await stylistPlan(
+    env, sentence, context, onEvent && ((thought) => onEvent({ type: "thought", thought })), person, wardrobe,
+  );
   const tPlan = Date.now();
   const base = {
     kind: plan.kind, question: plan.question, understood: plan.understood, constraints: plan.constraints, memory_update: plan.memory,
@@ -62,10 +68,17 @@ export async function recommend(
 
   onEvent?.({ type: "stage", stage: "search" });
   const catalog = await loadCatalog(env);
-  const queries = plan.looks.flatMap((look) => look.pieces.map((p) => queryFor(p, plan.constraints)));
+  // A piece the stylist took from the person's own wardrobe needs no search: it is the one garment it can be.
+  const ownById = new Map([...(closet?.placed ?? []), ...(closet?.pool ?? [])].map((i) => [i.id, i]));
+  const own = (piece: { own?: string | null }) => (piece.own ? ownById.get(piece.own) : undefined);
+  const queries = plan.looks.flatMap((look) => look.pieces.filter((p) => !own(p)).map((p) => queryFor(p, plan.constraints)));
   const { results, by } = await runSearches(env, catalog, queries);
   let k = 0;
-  const perLook = plan.looks.map((look) => look.pieces.map(() => results[k++]));
+  const perLook = plan.looks.map((look) => look.pieces.map((p) => {
+    const mine = own(p);
+    if (!mine) return results[k++];
+    return { hits: [{ ...ownedItem(mine), similarity: 1, matched_by: "photo" as const }], eligible: 1 };
+  }));
   const filled = withinBudget(fillLooks(plan, perLook));
   const tSearch = Date.now();
   if (!filled.length) {
@@ -92,10 +105,12 @@ export async function recommend(
   // One revision at most: the critic kept a look but wants one garment searched again.
   const revised = new Map<string, { piece: number; why: string }>();
   const r = verdict.revise;
-  if (r && Date.now() - t0 < REVISION_BEFORE_MS) {
+  const revisable = r && !filled.find((l) => l.id === r.id)?.items[r.piece].owned; // never replace their own garment
+  if (r && revisable && Date.now() - t0 < REVISION_BEFORE_MS) {
     onEvent?.({ type: "stage", stage: "revise" });
     const look = filled.find((l) => l.id === r.id)!;
     const piece = { ...look.plan.pieces[r.piece], search: r.search, types: undefined };
+
     const exclude = filled.flatMap((l) => l.items.map((i) => i.article_id));
     const budget = plan.constraints.budget_max_twd;
     const room = budget ? budget - (look.total_price - look.items[r.piece].price) : undefined; // the swap must still fit
@@ -108,6 +123,11 @@ export async function recommend(
     }
   }
 
+  // Their own garments must not be swapped away by the critic's revision either: it only asked for a search.
+  const captionVec = (id: string) => {
+    const row = catalog.idToRow.get(id);
+    return row === undefined ? null : catalog.text.subarray(row * EMBEDDING_DIM, (row + 1) * EMBEDDING_DIM);
+  };
   const keep = verdict.keep.length ? verdict.keep : filled.slice(0, 3).map((l) => ({ id: l.id, reason: l.plan.idea }));
   // Other candidates the engine found for the same piece, for swapping one garment on the card.
   const shown = new Set(filled.flatMap((l) => l.items.map((i) => i.article_id)));
@@ -122,6 +142,7 @@ export async function recommend(
       over_budget: Boolean(plan.constraints.budget_max_twd && look.total_price > plan.constraints.budget_max_twd),
       pieces: look.items.map((item, p) => ({
         label: look.plan.pieces[p].label, why: look.plan.pieces[p].why, item, alternates: alternatesFor(id, look.plan.pieces[p]),
+        similar: closet && !item.owned ? similarOwned(closet, item, captionVec(item.article_id)) : null,
       })),
       revised: revised.get(id) ?? null,
     };

@@ -25,8 +25,9 @@ const piece = {
     types: { type: "array", items: { type: "string", enum: PRODUCT_TYPES }, description: "Catalogue types to restrict to when you are sure (e.g. [\"Coat\"], [\"Sandals\"]). Empty to allow any type in the slot." },
     label: { type: "string", description: "The same garment in the person's language, at most 12 characters." },
     why: { type: "string", description: "In the person's language, the reasoning from THEIR words to this garment. At most 40 characters." },
+    own: { type: ["string", "null"], description: "The id of one of the person's own clothes (c1, p1…) to wear here; null to search the shop." },
   },
-  required: ["slot", "search", "avoid", "types", "label", "why"],
+  required: ["slot", "search", "avoid", "types", "label", "why", "own"],
 };
 
 const SCHEMA = {
@@ -101,6 +102,12 @@ they said what to avoid ("不要花紋", "不要太暴露") or the occasion clea
 thing itself ("a busy floral print", "a top with thin spaghetti straps"). Never put "not" or "no" inside
 \`search\` — the search engine reads words, not negations.
 
+You may be shown the person's own clothes. Wear one by putting its id in \`own\` (and still write \`search\`, \`label\`
+and \`why\` for it, so the card reads the same); garments on the mannequin must appear in every look. Use their own
+clothes when they suit the brief, and the shop for the rest — they came to be shown something new, so build each
+look around one or two of their garments at most (besides anything on the mannequin) and keep the looks different
+from each other. A garment of theirs that does not suit the brief is simply not used.
+
 constraints: only what the person actually said. Gender: "men" only if they imply menswear; otherwise "women".
 
 You may be told what you remember about the person, their body and how they reacted to earlier looks. Use it the
@@ -141,6 +148,7 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
       return true;
     }).map((p) => ({
       ...p,
+      own: typeof p.own === "string" && p.own.trim() ? p.own.trim() : null,
       search: p.search.slice(0, 300),
       avoid: (p.avoid ?? []).filter((a) => a?.trim()).slice(0, 2),
       types: (p.types ?? []).filter((t) => TYPES_BY_SLOT[p.slot].includes(t)),
@@ -168,9 +176,9 @@ export function tidyPlan(raw: StylistPlan): StylistPlan {
  * the plan is streamed and each readable field (what was understood, look titles, garments) is passed on as written.
  */
 export async function plan(
-  env: Env, sentence: string, context = "", onThought?: (t: Thought) => void, person?: Person,
+  env: Env, sentence: string, context = "", onThought?: (t: Thought) => void, person?: Person, closet = "",
 ): Promise<StylistPlan> {
-  const about = person ? describePerson(person) : "";
+  const about = [person ? describePerson(person) : "", closet].filter(Boolean).join("\n\n");
   const raw = await structuredOutput<StylistPlan>(env, {
     name: "stylist_plan",
     schema: SCHEMA,
