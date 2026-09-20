@@ -7,9 +7,9 @@ import { LIMITS, withModel } from "../config";
 import { askerOf, keepRecord } from "../history";
 import { HttpError, json, type RouteContext, readJson } from "../lib/http";
 import { describePerson, personFrom } from "../person";
-import { keepDemand } from "../signals";
 import { recommend as run } from "../pipeline";
 import type { ProgressEvent } from "../progress";
+import { keepDemand } from "../signals";
 
 export async function recommend({ request, env: baseEnv, ctx }: RouteContext): Promise<Response> {
   const body = await readJson<V1Request>(request, LIMITS.maxBodyBytes);

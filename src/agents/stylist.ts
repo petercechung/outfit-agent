@@ -6,10 +6,10 @@
 // the catalogue's own vocabulary.
 import type { LookPlan, Piece, RequestKind, StylistPlan } from "../contracts";
 import { COLOURS, PRODUCT_TYPES, SLOTS, type Slot, TYPES_BY_SLOT } from "../engine/vocabulary";
-import { SIGNAL_OCCASIONS } from "../signals";
 import { structuredOutput } from "../lib/openai";
 import { describePerson, MEMORY_MAX_CHARS, type Person } from "../person";
 import { type Thought, thoughtStream } from "../progress";
+import { SIGNAL_OCCASIONS } from "../signals";
 
 // Four looks: enough for the critic to keep three different ones. Measured on 「下週一面試」: six looks with an
 // avoid phrase on every piece took 13.3 s to plan and 48 phrases to embed; four looks with avoid only where

@@ -1,38 +1,26 @@
 # 一句穿搭 v2 — Outfit in a Sentence
 
-<<<<<<< HEAD
-**Features**
-The app consists of four main pages:
-Today: Describe your needs in one sentence, and AI recommends multiple outfits with styling reasons.
-Outfit Wall: Browse other users’ outfit journals and find inspiration.
-Journal: Your own complete Junk Journal, where you can add photos.
-My Closet: Manage the clothes you actually own.
-**Today**
-The page is divided into two sections: Say It in One Sentence and Save My Clothes.
-**Say It in One Sentence**
-1.Say It in One Sentence:
-Enter your outfit needs in one sentence. The system converts natural language into structured styling criteria and generates 3 complete outfits with styling reasons and items that can be purchased directly. The first column displays the complete outfit on a model. Individual items are shown afterward, and similar or identical items are also recommended within each item section as alternatives.
-2.Closet Options (Off by Default):
-3.Prioritize My Closet: When generating outfits, prioritize clothes you already own.
-   Remind Me About Similar Items in My Closet: When you are about to purchase an item, the app will proactively remind you if you already own a similar piece.
-4.Find Similar Items from Photos:
-AI identifies each clothing item in a photo and finds the most similar, directly purchasable products in the database. You can then save them to your favorites.
-5.Feedback & Adjustments:
-After each recommendation, the app asks “What would you like to adjust?” You can provide feedback through quick-select options or by entering your own text.
-
-
-
-v2 of the one-sentence outfit recommender for the 2026 梅竹黑客松 × 聚陽實業 challenge. v1 (rule-based) stays live at
-[outfit.cechung.com](https://outfit.cechung.com) in `petercechung/MeiChu`.
-=======
 Say one sentence — 「下週一面試，想要簡約但不要太死板」 — and get three complete, purchasable outfits from a real
 catalogue of 11,636 H&M items, each garment explained, and change them by saying what you want different.
->>>>>>> 1f991c2dc58cdeaecf359d4cea51be155f44b4f6
 
 Built for the 2026 梅竹黑客松 × 聚陽實業 challenge. Live: **https://stylist.cechung.com** (interface in 中文/EN).
 
 v1, the rule-based version this replaces, is still live at [outfit.cechung.com](https://outfit.cechung.com)
 (repo `petercechung/MeiChu`), and v2 still serves a few of its pages through a proxy (see *What v2 does not own*).
+
+## The four pages
+
+- **今天 Today** — say what today is and get outfits. Two modes: *說一句話* (describe it) and *從我的衣服搭*
+  (start from clothes you own, on a mannequin). Each look shows a collage of the whole outfit, then every garment
+  on its own with alternatives to swap in, the price, and why it was chosen. Two options, both off by default:
+  *優先用我的衣櫃* prefers clothes you already own, and *提醒衣櫃已有類似的* warns you before buying something
+  close to what you have. *照片找同款* finds the closest purchasable products to a garment in a photo. After every
+  answer the page asks 「哪裡想調整？」 — tap a chip or say it in your own words.
+- **穿搭牆 Outfit Wall** — outfits other people posted, filtered and sorted, with people of a similar build first.
+- **手帳 Journal** — your saved outfits and your own photos, arranged as draggable cut-outs with notes and a
+  count of how often you actually wore each one.
+- **我的 Me** — the wardrobe you photographed, your body profile, what the stylist remembers about your style
+  (editable), the products you saved, and the evidence that it is improving.
 
 ---
 
