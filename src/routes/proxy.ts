@@ -2,7 +2,7 @@
 // (outfit.cechung.com, same catalogue in R2). The copied page calls these paths here; they are passed through.
 import type { RouteContext } from "../lib/http";
 
-const V1 = "https://outfit.cechung.com";
+export const V1 = "https://outfit.cechung.com";
 
 export async function toV1({ request }: RouteContext): Promise<Response> {
   const url = new URL(request.url);

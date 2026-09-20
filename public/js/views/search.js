@@ -10,7 +10,8 @@ import { lookBoard } from "../shared/lookboard.js";
 import { closetOptionsHtml } from "../shared/options.js";
 import { intentTiles, openItemSheet, productTile, reasonList, swatchRow } from "../shared/outfit.js";
 import {
-  attachClosetPhotos, closetOptionFields, loopFields, prefs, profile, profileFields, recordFeedback, recordRound,
+  afterRecommendation, attachClosetPhotos, closetOptionFields, loopFields, memoryFields, prefs, profile, profileFields,
+  recordFeedback, recordRound, unrecordFeedback,
   updateStyleProfile,
 } from "../shared/store.js";
 import { $, colourLabel, esc, formatPrice, notice, onTabOpen, toast } from "../shared/ui.js";
@@ -102,9 +103,58 @@ function onProgress(event) {
   if (box) box.innerHTML = thinkingView();
 }
 
+/**
+ * ④ After the looks are on screen, the analyst agent takes its time over each one (the person's words, the photos,
+ * this week's fashion media) and its write-up streams into the card. Kept on the look, so re-renders keep it.
+ */
+function analysisView(look, k) {
+  const a = look.analysis;
+  if (!a) return `<div class="analysis" id="analysis-${k}" hidden></div>`; // filled in once the analyst starts
+  const body = a.text
+    ? esc(a.text.trim()).replace(/【(.+?)】|\[(.+?)\]/g, (_, zh, en) => `<b>${zh ?? en}</b> `).replace(/\n+/g, "<br>")
+    : `<span class="thinking-stage">${L("造型分析師正在仔細看這套…", "The analyst is taking a careful look…")}</span>`;
+  return `<div class="analysis" id="analysis-${k}">
+    <div class="label">${L("造型分析", "Analysis")}${a.done ? "" : ` <span class="muted">· ${L("思考中", "thinking")}</span>`}</div>
+    <p>${body}</p></div>`;
+}
+
+function analyseLook(k) {
+  const shownFor = result;
+  const look = result.outfits[k];
+  const intentReason = look.reasons.find((r) => r.group === "stylist" && r.key === "intent");
+  look.analysis = { text: "", done: false };
+  const redraw = () => {
+    const box = $(`#analysis-${k}`);
+    if (shownFor === result && box) box.outerHTML = analysisView(look, k);
+  };
+  redraw(); // show 「正在仔細看」 right away
+  api.analyzeStream({
+    sentence: result.intent.raw_text, title: look.theme?.label ?? "", idea: intentReason?.text ?? "",
+    article_ids: look.items.filter((i) => !i.owned).map((i) => i.article_id),
+    memory: memoryFields().memory, profile,
+  }, (delta) => {
+    look.analysis.text += delta;
+    redraw();
+  }).catch(() => {
+    look.analysis.text ||= L("分析暫時無法完成", "The analysis is unavailable right now");
+  }).finally(() => {
+    look.analysis.done = true;
+    redraw();
+  });
+}
+
+const analyseAll = () => result.outfits.forEach((_, k) => analyseLook(k));
+
 const startThinking = () => { thinking = { stage: "plan", stages: ["plan"], started: Date.now(), understood: "", looks: [] }; };
 
-const requestFields = () => ({ prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...(priority ? { priority } : {}) });
+const requestFields = () => ({
+  prefs, profile, ...profileFields(), ...closetOptionFields(), ...loopFields(), ...memoryFields(), ...(priority ? { priority } : {}),
+});
+
+/** The stylist may have learnt something lasting: it is now in 「我的」 → 造型師記得的你. */
+function keepMemory(r) {
+  if (afterRecommendation(r.memory_update)) toast(L("造型師記住了你的喜好（可在「我的」查看與修改）", "Your stylist noted your taste (see Me to read or edit it)"));
+}
 
 export async function runSearch(text = $("#q").value.trim()) {
   if (!text) return;
@@ -117,8 +167,10 @@ export async function runSearch(text = $("#q").value.trim()) {
   try {
     result = attachClosetPhotos(await api.recommendStream({ text, ...requestFields() }, onProgress));
     finishThinking(result.model);
+    keepMemory(result);
     recordRound(result);
     render();
+    analyseAll();
   } catch (error) {
     thinking = null;
     thought = null;
@@ -147,6 +199,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     unchangedByFeedback = !regenerate && signature(next) === signature(result);
     result = attachClosetPhotos(next);
     finishThinking(result.model);
+    keepMemory(result);
     recordRound(result);
     rating = null;
     chosenLook = null;
@@ -156,6 +209,7 @@ async function refine({ text = "", adjust, regenerate = false }) {
     refining = false;
     thinking = null;
     render();
+    if (result.outfits.some((o) => !o.analysis)) analyseAll();
     $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
@@ -217,6 +271,7 @@ function lookCard(look, k) {
     </div>
     ${swatches ? swatchRow(swatches) : ""}
     ${lookSummary(look)}
+    ${analysisView(look, k)}
     <div class="total-row">
       <div class="icon-actions">
         <button class="icon-btn" ${attrs("look-like")} aria-label="${L("喜歡這套", "Like")}" aria-pressed="${pressed("like")}">${icon("heart")}</button>
@@ -282,11 +337,20 @@ function swapItem(look, j, alternate) {
   look.items[j] = { ...alternate, intent_pct: old.intent_pct, fit_note: null, alternates: [old, ...others] };
   look.total_price = look.items.reduce((sum, item) => sum + item.price, 0);
   render();
+  analyseLook(result.outfits.indexOf(look)); // a different outfit now: analyse it again
   toast(L("已替換，也記下你的選擇", "Swapped, and noted your choice"));
 }
 
 function rateLook(data, action) {
-  recordFeedback(result.outfits[data.look].items, action);
+  const look = result.outfits[data.look];
+  if (rating?.look === Number(data.look) && rating.action === action) { // pressed again: take it back
+    unrecordFeedback(look.items, action);
+    rating = null;
+    render();
+    return toast(L("已取消", "Undone"));
+  }
+  if (rating?.look === Number(data.look)) unrecordFeedback(look.items, rating.action); // changed their mind
+  recordFeedback(look.items, action);
   rating = { look: Number(data.look), action };
   render();
 }
@@ -320,8 +384,22 @@ export const actions = {
     const look = result.outfits[data.look];
     const item = look.items[data.item];
     openItemSheet(item, {
-      onLike: () => { recordFeedback([item], "like"); toast(L("記下了", "Noted")); },
-      onDislike: () => { recordFeedback([item], "dislike"); toast(L("之後會少推這種", "We'll show fewer like this")); },
+      onLike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "like");
+          return toast(L("已取消", "Undone"));
+        }
+        recordFeedback([item], "like");
+        toast(L("記下了", "Noted"));
+      },
+      onDislike: (already) => {
+        if (already) {
+          unrecordFeedback([item], "dislike");
+          return toast(L("已取消", "Undone"));
+        }
+        recordFeedback([item], "dislike");
+        toast(L("之後會少推這種", "We'll show fewer like this"));
+      },
       onPickAlternate: (alternate) => swapItem(look, Number(data.item), alternate),
     });
   },

@@ -3,7 +3,7 @@ import { taiwanToday, tidyPlan } from "../src/agents/stylist";
 import type { StylistPlan } from "../src/contracts";
 
 const base = (looks: StylistPlan["looks"], kind: StylistPlan["kind"] = "outfit"): StylistPlan => ({
-  kind, question: null, understood: "面試", looks,
+  kind, question: null, understood: "面試", looks, memory: null, occasion: null, style_keywords: [],
   constraints: { gender: "women", budget_max_twd: null, avoid_colours: [], avoid_types: [] },
 });
 const p = (slot: string, extra = {}) => ({ slot, search: `a ${slot} in cotton`, label: slot, why: "因為", avoid: [], types: [], ...extra }) as never;
@@ -44,5 +44,13 @@ describe("tidyPlan", () => {
 describe("taiwanToday", () => {
   it("is the date in Taiwan (UTC+8)", () => {
     expect(taiwanToday(Date.UTC(2026, 8, 19, 17, 0))).toBe("2026-09-20");
+  });
+});
+
+describe("style memory", () => {
+  it("keeps a rewritten memory, trimmed to a paragraph, and null when there is nothing new", () => {
+    expect(tidyPlan({ ...base([]), kind: "vague", memory: "  喜歡粉色，不穿黑色  " }).memory).toBe("喜歡粉色，不穿黑色");
+    expect(tidyPlan({ ...base([]), kind: "vague", memory: "   " }).memory).toBeNull();
+    expect(tidyPlan({ ...base([]), kind: "vague", memory: "字".repeat(2000) }).memory).toHaveLength(600);
   });
 });

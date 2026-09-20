@@ -3,7 +3,11 @@
 //   ① engine   src/engine/   facts about the catalogue and a search over them
 //   ② stylist  src/agents/   reads the sentence, decides what to wear, searches for concrete garments
 //   ③ critic   src/agents/   looks at the finished outfits against the original sentence
+//   ④ analyst  src/agents/   after the looks are shown: a slower, streamed analysis of each one (prompt + trends)
+import { loadCatalog } from "./engine/catalog";
+import { encodeForPhotos } from "./engine/encoder";
 import { HttpError, json, type RouteContext } from "./lib/http";
+import { analyze } from "./routes/analyze";
 import { encode } from "./routes/encode";
 import { health } from "./routes/health";
 import { thumbnail } from "./routes/media";
@@ -27,15 +31,30 @@ const ROUTES: Route[] = [
   { method: "POST", pattern: /^\/api\/plan$/, handler: plan, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/recommend$/, handler: recommend, needsOpenAI: true },
   { method: "POST", pattern: /^\/api\/v2\/recommend$/, handler: recommendV2, needsOpenAI: true },
+  { method: "POST", pattern: /^\/api\/analyze$/, handler: analyze, needsOpenAI: true },
   // Not rebuilt in v2: passed through to v1 (routes/proxy.ts).
   ...["GET", "POST", "DELETE"].map((method) => ({
-    method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|verify|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,
+    method, pattern: /^\/(api\/(photo|events|insights|trends|trends\/refresh|feed)(\/.*)?|feed-images\/.*)$/, handler: toV1,
   })),
 ];
 
 export { FashionTextEncoder } from "./engine/encoder"; // the container class wrangler.jsonc binds
 
+/**
+ * Keeps the FashionCLIP container awake (it sleeps after 30 minutes). A cold start takes longer than the encode
+ * timeout, so the first request after a quiet spell would fall back to the learned map; a demo should not.
+ */
+export async function warmEncoder(env: Env): Promise<void> {
+  const catalog = await loadCatalog(env);
+  const { by } = await encodeForPhotos(env, catalog, ["a white cotton shirt"]);
+  console.log("warm-up encoded by:", by);
+}
+
 export default {
+  async scheduled(_event, env, ctx): Promise<void> {
+    ctx.waitUntil(warmEncoder(env).catch((e) => console.error("warm-up failed:", (e as Error).message)));
+  },
+
   async fetch(request, env, ctx): Promise<Response> {
     const { pathname } = new URL(request.url);
     try {

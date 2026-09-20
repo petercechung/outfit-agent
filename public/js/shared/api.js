@@ -69,7 +69,24 @@ async function recommendStream(body, onEvent) {
   throw new Error("連線中斷，請再試一次");
 }
 
+/** The analyst agent's write-up of one look (src/routes/analyze.ts), streamed: onDelta sees each new piece of text. */
+async function analyzeStream(body, onDelta) {
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, ...who(), lang }),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    onDelta(value);
+  }
+}
+
 export const api = {
+  analyzeStream,
   /** {text, prefs, closet_items?, profile?} -> RecommendResponse (src/types.ts) */
   recommend: (body) => post("/api/recommend", { ...body, ...who() }),
   recommendStream,
@@ -83,14 +100,13 @@ export const api = {
   trends: () => request("GET", "/api/trends"),
   /** Collect now (the server ignores it if the snapshot is only minutes old) -> TrendSnapshot */
   refreshTrends: () => post("/api/trends/refresh"),
-  /** Leave-one-out check of the person's own feedback log -> VerifyResponse */
-  verify: (events) => post("/api/verify", { events }),
   /** mode "closet" -> {garment, vec}; mode "inspo" -> {garments: [...matches], style_keywords} */
   analyzePhoto: (image, mode) => post("/api/photo", { image, mode }),
   feed: {
-    list({ sort, height_cm, body_type, offset = 0 }) {
+    list({ sort, height_cm, weight_kg, body_type, offset = 0 }) {
       const query = new URLSearchParams({ sort, offset: String(offset) });
       if (height_cm) query.set("height_cm", String(height_cm));
+      if (weight_kg) query.set("weight_kg", String(weight_kg));
       if (body_type) query.set("body_type", body_type);
       return request("GET", `/api/feed?${query}`);
     },

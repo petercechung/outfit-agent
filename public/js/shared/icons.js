@@ -25,6 +25,7 @@ const PATHS = {
   upload: '<path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/>',
   eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 22 12a14 14 0 0 1-3 3.6M6.5 6.6A14 14 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1"/>',
   ruler: '<path d="M4 17 17 4l3 3L7 20z"/><path d="m8 13 2 2m1-5 2 2m1-5 2 2"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/>',
 };
 
 export function icon(name, size = 20) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { thoughtStream, thoughtsIn } from "../src/progress";
+import { searchTextsIn, thoughtStream, thoughtsIn } from "../src/progress";
 
 const plan = JSON.stringify({
   kind: "outfit", question: null, understood: "下週一面試，想要「簡約」",
@@ -24,5 +24,16 @@ describe("thoughtStream", () => {
     const feed = thoughtStream((t) => seen.push(t.key));
     for (let n = 1; n <= plan.length; n++) feed(plan.slice(0, n));
     expect(seen).toEqual(["understood", "title", "idea", "label", "why"]);
+  });
+});
+
+describe("searchTextsIn", () => {
+  it("collects garment descriptions and avoid phrases as soon as each is complete", () => {
+    const partial = '{"looks":[{"pieces":[{"search":"a white cotton shirt","avoid":["a busy floral print"],"label":"襯衫"},{"search":"black tapered trou';
+    expect(searchTextsIn(partial)).toEqual(["a white cotton shirt", "a busy floral print"]);
+  });
+
+  it("ignores an empty avoid list", () => {
+    expect(searchTextsIn('{"search":"a wool coat","avoid":[]}')).toEqual(["a wool coat"]);
   });
 });

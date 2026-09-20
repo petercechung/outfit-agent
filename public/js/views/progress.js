@@ -1,120 +1,113 @@
-// 我的 → 進步驗證: evidence that the system gets better for this person (可變強), in three ways.
+// 我的 → 進步驗證: evidence that the system gets better for this person (可變強), in two ways.
 //   1. Your curve: share of result rounds whose looks you liked or saved, round by round.
-//   2. Leave-one-out: each item you liked is hidden, and we check whether your other feedback ranks it higher.
-//   3. Simulation: shoppers with a hidden taste, with and without the feedback loop (live, and at scale).
+//   2. Simulated shoppers: the same shopper, same sentences, with and without the style memory the stylist keeps
+//      (src/person.ts). Each round the shopper reacts to what it was shown; with memory on, those reactions go
+//      back and the stylist rewrites what it remembers. Every round is a real recommendation from this site.
 import { api } from "../shared/api.js";
 import { lineChart } from "../shared/chart.js";
-import { PERSONAS, simulateShopper, summarize } from "../shared/simulate.js";
-import { feedbackLog, rounds } from "../shared/store.js";
+import { PERSONAS, SENTENCES } from "../shared/simulate.js";
+import { rounds } from "../shared/store.js";
 import { $, esc, loading, notice } from "../shared/ui.js";
 
-const LIVE = { shoppers: 3, rounds: 5 };
+const LIVE = { shoppers: 2, rounds: 3 }; // each round is a real recommendation (~15 s), so keep it small
 const pct = (x) => `${Math.round(x * 100)}%`;
 
-let verifyResult = null; // VerifyResponse
-let study = null; // /eval/loop.json from scripts/eval-loop.mjs
-let live = null; // { none: [curves], thompson: [curves], done }
+let live = null; // { withMemory: [[rate]], without: [[rate]], memories: [text], done }
 
 function yourCurve() {
   const recent = rounds.slice(-10);
   if (recent.length < 2) return `<p class="muted">再搜尋並回饋幾次（按喜歡、存手帳），這裡會畫出你的命中率變化。</p>`;
   const rates = recent.map((r) => r.hits.length / r.looks.length);
+  const matches = recent.map((r) => (typeof r.match === "number" ? r.match : null));
   const firstHalf = rates.slice(0, Math.ceil(rates.length / 2));
   const secondHalf = rates.slice(Math.ceil(rates.length / 2));
   const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  return `${lineChart([{ label: "你喜歡或存下的 Look 比例", values: rates, tone: "ink" }])}
+  return `${lineChart([
+    { label: "你喜歡或存下的 Look 比例", values: rates, tone: "ink" },
+    ...(matches.some((m) => m !== null) ? [{ label: "是你最常喜歡的顏色／款式的比例", values: matches.map((m) => m ?? 0), tone: "accent" }] : []),
+  ])}
     <p class="muted">前半 ${pct(mean(firstHalf))} → 後半 ${pct(mean(secondHalf))}（最近 ${recent.length} 輪搜尋）</p>`;
 }
 
-function verifyHtml() {
-  if (!verifyResult) return "";
-  const v = verifyResult;
-  if (!v.enough) return notice(`再按喜歡或存下 ${v.needed} 件單品，就能驗證。`);
-  return `<div class="notice notice-ok">把你喜歡的 ${v.held_out} 件單品逐一藏起來，只用你其他的回饋來排序：
-    平均排名從前 ${pct(1 - v.baseline_pct)}（只看熱銷）提升到前 ${pct(1 - v.personalized_pct)}，
-    ${pct(v.improved_share)} 的單品排名上升。</div>`;
-}
-
-/** The paired result: same shopper, same requests, with vs without the loop. */
-function liftHtml(lift) {
-  if (!lift?.thompson) return "";
-  const pts = (x) => (x * 100).toFixed(1);
-  const row = (label, l) => `<li>${label}：平均 <b>+${pts(l.mean)}</b> 個百分點（95% CI ${pts(l.mean - l.ci)} ~ ${pts(l.mean + l.ci)}）</li>`;
-  return `<div class="notice notice-ok">和同一位顧客「沒有回饋」相比，最後 ${lift.late_rounds} 輪的命中率：
-    <ul>${row("有回饋", lift.greedy)}${row("有回饋＋探索", lift.thompson)}</ul></div>`;
-}
-
-function studyHtml() {
-  if (!study) return "";
-  const s = study.policies;
-  const last = (p) => s[p].mean.at(-1);
-  return `${lineChart([
-    { label: "沒有回饋", values: s.none.mean, band: s.none.ci, tone: "muted" },
-    { label: "有回饋", values: s.greedy.mean, band: s.greedy.ci, tone: "ink" },
-    { label: "有回饋＋探索", values: s.thompson.mean, band: s.thompson.ci, tone: "accent" },
-  ])}
-  ${liftHtml(study.lift)}
-  <p class="muted">${study.shoppers} 位模擬顧客 × ${study.rounds} 輪（陰影 = 95% 信賴區間）。第 ${study.rounds} 輪命中率：
-    沒有回饋 ${pct(last("none"))}、有回饋 ${pct(last("greedy"))}、有回饋＋探索 ${pct(last("thompson"))}。
-    產生於 ${esc(study.generated_at)}，可用 <code>npm run eval:loop</code> 重跑。</p>`;
-}
+/** Mean of each round across shoppers; [] while nothing has finished. */
+const byRound = (curves) => {
+  const n = Math.min(...curves.map((c) => c.length), LIVE.rounds);
+  return Array.from({ length: Math.max(0, n) }, (_, r) => curves.reduce((s, c) => s + c[r], 0) / curves.length);
+};
 
 function liveHtml() {
   if (!live) return "";
-  const none = summarize(live.none);
-  const learning = summarize(live.thompson);
-  return `${lineChart([
-    { label: "沒有回饋", values: none.map((r) => r.mean), tone: "muted" },
-    { label: "有回饋＋探索", values: learning.map((r) => r.mean), tone: "accent" },
-  ])}
-  <p class="muted">${live.done ? "完成" : "模擬中…"}：${live.thompson.length} 位顧客（${PERSONAS.slice(0, LIVE.shoppers).map((p) => p.name).join("、")}），
-    每人 ${LIVE.rounds} 輪，每輪按喜歡符合口味的、按不喜歡要避開的顏色。</p>`;
+  const names = PERSONAS.slice(0, LIVE.shoppers).map((p) => p.name).join("、");
+  const withMemory = live.withMemory.length ? byRound(live.withMemory) : [];
+  const without = live.without.length ? byRound(live.without) : [];
+  const gain = withMemory.length && without.length ? withMemory.at(-1) - without.at(-1) : null;
+  return `${withMemory.length ? lineChart([
+    { label: "沒有記憶", values: without, tone: "muted" },
+    { label: "造型師記得你", values: withMemory, tone: "accent" },
+  ]) : ""}
+  ${gain !== null ? `<div class="notice notice-ok">最後一輪：沒有記憶 ${pct(without.at(-1))} → 有記憶 ${pct(withMemory.at(-1))}
+    （${gain >= 0 ? "+" : ""}${Math.round(gain * 100)} 個百分點）。</div>` : ""}
+  ${live.memories.map((m) => `<p class="muted">造型師記下的：${esc(m)}</p>`).join("")}
+  <p class="muted">${live.done ? "完成" : "模擬中…"}：${LIVE.shoppers} 位顧客（${names}）× ${LIVE.rounds} 輪，
+    每輪都是真的推薦，顧客會對符合口味的按喜歡、對要避開的顏色按不喜歡。</p>`;
 }
 
 export function progressSection() {
   return `<div class="stack">
     <div class="label">1 · 你的命中率</div>
     ${yourCurve()}
-    <div class="label">2 · 用你的紀錄驗證</div>
-    <p class="muted">把你喜歡過的單品藏起來，看系統只靠其他回饋能不能把它排到前面（leave-one-out）。</p>
-    <div><button class="btn btn-sm" data-action="progress-verify">開始驗證</button></div>
-    <div id="verifyResult">${verifyHtml()}</div>
-    <div class="label">3 · 模擬顧客</div>
-    <p class="muted">每位模擬顧客有隱藏的喜好，重複「推薦 → 回饋」。有沒有回饋迴圈，命中率差多少？</p>
-    <div id="studyResult">${studyHtml()}</div>
-    <div><button class="btn btn-sm" data-action="progress-simulate" ${live && !live.done ? "disabled" : ""}>現場模擬（約 20 秒）</button></div>
+    <div class="label">2 · 模擬顧客</div>
+    <p class="muted">模擬顧客有隱藏的喜好，重複「推薦 → 回饋」。同一位顧客、同樣的句子，造型師記不記得他，命中率差多少？</p>
+    <div><button class="btn btn-sm" data-action="progress-simulate" ${live && !live.done ? "disabled" : ""}>現場模擬（約 2 分鐘）</button></div>
     <div id="liveResult">${liveHtml()}</div>
   </div>`;
 }
 
-/** Loads the offline study once; safe to call on every render. */
-export async function loadStudy() {
-  if (study) return;
-  try {
-    const response = await fetch("/eval/loop.json");
-    if (response.ok) study = await response.json();
-    const el = $("#studyResult");
-    if (el) el.innerHTML = studyHtml();
-  } catch {
-    // the offline study is optional
+/** Kept so 我的 can call it; there is no offline study in v2. */
+export function loadStudy() {}
+
+/** What this shopper thinks of the items in one answer, and what it would press. */
+function react(persona, result) {
+  const items = result.outfits.flatMap((o) => o.items).filter((i) => !i.owned);
+  const likes = (i) => persona.likes.colour.includes(i.colour_master) || persona.likes.type.includes(i.type);
+  const avoids = (i) => persona.avoids.includes(i.colour_master);
+  const reactions = [
+    ...items.filter(likes).slice(0, 4).map((i) => `喜歡：${i.colour_master} ${i.type}「${i.name}」`),
+    ...items.filter(avoids).slice(0, 4).map((i) => `不喜歡：${i.colour_master} ${i.type}「${i.name}」`),
+  ];
+  return { rate: items.length ? items.filter(likes).length / items.length : 0, reactions };
+}
+
+/** One shopper's rounds. With `remember` off, nothing is carried between rounds. */
+async function shop(persona, remember, onRound) {
+  const rates = [];
+  let memory = "";
+  let reactions = [];
+  for (let r = 0; r < LIVE.rounds; r++) {
+    const result = await api.recommend({ text: SENTENCES[r % SENTENCES.length], memory, reactions });
+    const seen = react(persona, result);
+    rates.push(seen.rate);
+    if (remember) {
+      reactions = seen.reactions;
+      memory = result.memory_update ?? memory;
+    }
+    onRound();
   }
+  return { rates, memory };
 }
 
 async function simulateLive() {
-  live = { none: [], thompson: [], done: false };
+  live = { withMemory: [], without: [], memories: [], done: false };
   const redraw = () => {
     const el = $("#liveResult");
     if (el) el.innerHTML = liveHtml();
   };
   $("#liveResult").innerHTML = loading("模擬顧客正在逛…");
-  const recommend = (body) => api.recommend(body);
-  for (const [k, persona] of PERSONAS.slice(0, LIVE.shoppers).entries()) {
-    const [none, thompson] = await Promise.all([
-      simulateShopper(recommend, persona, { rounds: LIVE.rounds, policy: "none", seed: k + 1 }),
-      simulateShopper(recommend, persona, { rounds: LIVE.rounds, policy: "thompson", seed: k + 1 }),
-    ]);
-    live.none.push(none);
-    live.thompson.push(thompson);
+  for (const persona of PERSONAS.slice(0, LIVE.shoppers)) {
+    const [remembered, plain] = await Promise.all([shop(persona, true, redraw), shop(persona, false, redraw)]);
+    live.withMemory.push(remembered.rates);
+    live.without.push(plain.rates);
+    if (remembered.memory) live.memories.push(`${persona.name} → 「${remembered.memory}」`);
     redraw();
   }
   live.done = true;
@@ -122,14 +115,5 @@ async function simulateLive() {
 }
 
 export const actions = {
-  "progress-verify": async () => {
-    $("#verifyResult").innerHTML = loading("驗證中…");
-    try {
-      verifyResult = await api.verify(feedbackLog);
-      $("#verifyResult").innerHTML = verifyHtml();
-    } catch (error) {
-      $("#verifyResult").innerHTML = notice(error.message, "warn");
-    }
-  },
   "progress-simulate": () => simulateLive().catch((error) => ($("#liveResult").innerHTML = notice(error.message, "warn"))),
 };

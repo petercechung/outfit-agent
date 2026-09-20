@@ -27,6 +27,13 @@ export interface V1Request {
   tester?: string; // who is testing, from a ?tester= link (src/history.ts)
   client_id?: string; // a random id this browser keeps
   model?: string; // one of config.ts MODELS, from the page's model menu
+  memory?: string; // the person's style memory (src/person.ts), kept in their browser
+  reactions?: string[]; // their likes/dislikes on looks since the memory was last updated
+  profile?: unknown; // 我的資料: gender, height, body shape…
+  closet_items?: unknown; // garments on the mannequin (從我的衣服搭)
+  closet_pool?: unknown; // the rest of their wardrobe, when 優先用我的衣櫃 is on
+  closet_options?: unknown; // {use_closet, warn_similar}
+  share_signals?: boolean; // 我的: may this request become an anonymous demand signal (src/signals.ts)
   refine?: { previous_intent?: { raw_text?: unknown }; text?: string; adjust?: Record<string, unknown> };
 }
 
@@ -56,15 +63,19 @@ export function fromV1Request(body: V1Request): { sentence: string; context: str
 interface V1Item {
   article_id: string; name: string; type: string; slot: string; slot_zh: string; colour: string; colour_master: string;
   pattern: string; price: number; desc: string; image: string; fit_note: null; score: number; intent_pct: null; pref: number;
+  owned?: true; // one of their own clothes; the page puts the photo back (js/shared/store.js)
+  similar_owned?: { id: string; name: string };
   alternates: V1Item[];
 }
 
-function itemView(hit: SearchHit, lang: Lang, alternates: SearchHit[] = []): V1Item {
+function itemView(hit: SearchHit, lang: Lang, alternates: SearchHit[] = [], similar: { id: string; name: string } | null = null): V1Item {
   return {
     article_id: hit.article_id, name: hit.name, type: hit.type, slot: hit.slot,
     slot_zh: SLOT_NAME[hit.slot]?.[lang === "en" ? 1 : 0] ?? hit.slot, colour: hit.colour, colour_master: hit.colour_master,
     pattern: hit.pattern, price: hit.price, desc: hit.description, image: hit.image, fit_note: null,
     score: hit.similarity, intent_pct: null, pref: 0,
+    ...(hit.owned ? { owned: true } : {}),
+    ...(similar ? { similar_owned: similar } : {}),
     alternates: alternates.map((a) => itemView(a, lang)),
   };
 }
@@ -79,7 +90,7 @@ function outfitView(look: LookView, lang: Lang) {
   ];
   return {
     outfit_id: look.id, theme: { key: "brief", label: look.title }, tags: [], score: 0, total_price: look.total_price,
-    reasons, items: look.pieces.map((p) => itemView(p.item, lang, p.alternates)),
+    reasons, items: look.pieces.map((p) => itemView(p.item, lang, p.alternates, p.similar)),
   };
 }
 
@@ -99,9 +110,11 @@ export function toV1Response(r: RecommendResult, sentence: string, lang: Lang, f
       : r.question, // shown instead of looks (public/js/views/search.js)
     outfits: r.looks.map((l) => outfitView(l, lang)),
     relaxed: {}, weather_policy: { band: null, outer: "none", label: "" }, candidate_counts: {}, personalized: false,
-    closet_items: [], closet_options: { use_closet: false, warn_similar: false, pool_size: 0 },
+    closet_items: r.looks.flatMap((l) => l.pieces.filter((p) => p.item.owned).map((p) => p.item.article_id)),
+    closet_options: { use_closet: false, warn_similar: false, pool_size: 0 },
     coherence_source: "image", explored: false,
     applied_feedback: feedback ? [feedback] : [], profile_delta: null,
+    memory_update: r.memory_update, // the page saves it as the new style memory (「我的」)
     latency_ms: r.ms.total, ms: r.ms, encoded_by: r.encoded_by, critic: r.critic,
   };
 }

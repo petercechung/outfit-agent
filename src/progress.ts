@@ -11,6 +11,19 @@ export function thoughtsIn(partialJson: string): Thought[] {
   return [...partialJson.matchAll(FIELD)].map((m) => ({ key: m[1] as Thought["key"], value: JSON.parse(m[2]) as string }));
 }
 
+const SEARCH_FIELD = /"(?:search|avoid)"\s*:\s*("(?:[^"\\]|\\.)*"|\[[^\]]*\])/g;
+
+/**
+ * Every garment description already complete in the half-written plan. The pipeline encodes these while the
+ * stylist is still writing, so the search does not wait for the whole plan first.
+ */
+export function searchTextsIn(partialJson: string): string[] {
+  return [...partialJson.matchAll(SEARCH_FIELD)].flatMap((m) => {
+    const value = JSON.parse(m[1]) as string | string[];
+    return (Array.isArray(value) ? value : [value]).filter((v) => typeof v === "string" && v.trim());
+  });
+}
+
 /** Calls `emit` once per new field as the plan grows. */
 export function thoughtStream(emit: (t: Thought) => void): (soFar: string) => void {
   let sent = 0;

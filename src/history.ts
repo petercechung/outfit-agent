@@ -32,15 +32,15 @@ function looksShown(r: RecommendResult) {
 
 export async function recordRequest(
   env: Env,
-  asker: Asker,
+  asker: Asker & { person?: string },
   turn: { sentence: string; feedback: string | null },
   outcome: { result: RecommendResult } | { error: string },
 ): Promise<void> {
   const r = "result" in outcome ? outcome.result : null;
   await env.DB.prepare(
     `INSERT INTO requests (tester, client_id, country, user_agent, lang, turn, sentence, feedback, kind, understood,
-       question, budget_max_twd, looks, plan, verdict, encoded_by, critic, ms_plan, ms_search, ms_judge, ms_total, error, model)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       question, budget_max_twd, looks, plan, verdict, encoded_by, critic, ms_plan, ms_search, ms_judge, ms_total, error, model, person, memory_update)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     asker.tester, asker.client_id, asker.country, asker.user_agent, asker.lang,
     turn.feedback === null ? "new" : "refine", turn.sentence, turn.feedback,
@@ -50,13 +50,13 @@ export async function recordRequest(
     r?.trace.verdict ? JSON.stringify(r.trace.verdict) : null,
     r?.encoded_by ?? null, r?.critic ?? null, r?.ms.plan ?? null, r?.ms.search ?? null, r?.ms.judge ?? null, r?.ms.total ?? null,
     "error" in outcome ? outcome.error.slice(0, 500) : null,
-    env.OPENAI_MODEL,
+    env.OPENAI_MODEL, asker.person || null, r?.memory_update ?? null,
   ).run();
 }
 
 /** Starts the write in the background; a failed write is logged, never shown to the person. */
 export function keepRecord(
-  ctx: ExecutionContext, env: Env, asker: Asker, turn: { sentence: string; feedback: string | null },
+  ctx: ExecutionContext, env: Env, asker: Asker & { person?: string }, turn: { sentence: string; feedback: string | null },
   outcome: { result: RecommendResult } | { error: string },
 ): void {
   ctx.waitUntil(recordRequest(env, asker, turn, outcome).catch((e) => console.error("history write failed:", (e as Error).message)));

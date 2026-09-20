@@ -7,8 +7,8 @@ import { icon } from "../shared/icons.js";
 import { pickImageFile, resizeImage } from "../shared/images.js";
 import { productTile } from "../shared/outfit.js";
 import { closeSheet, openSheet } from "../shared/sheet.js";
-import { closet, journal, saveCloset } from "../shared/store.js";
-import { $, COLOUR_NAME, colourLabel, empty, esc, notice, OCCASION_NAME, options, SLOT_NAME } from "../shared/ui.js";
+import { closet, journal, saveCloset, saveWardrobeLayout, wardrobeLayout } from "../shared/store.js";
+import { $, $$, COLOUR_NAME, colourLabel, empty, esc, notice, OCCASION_NAME, options, SLOT_NAME } from "../shared/ui.js";
 
 const CATEGORIES = ["top", "bottom", "onepiece", "outer", "shoes", "bag", "accessory"];
 const SEASONS = L({ all: "四季", warm: "春夏", cool: "秋冬" }, { all: "All year", warm: "Spring / summer", cool: "Autumn / winter" });
@@ -40,6 +40,35 @@ function card(item) {
     </div></div>`;
 }
 
+function canvasPiece(item, index) {
+  const saved = wardrobeLayout[item.id];
+  const spot = saved ?? { x: 4 + (index % 3) * 33, y: 18 + Math.floor(index / 3) * 140 };
+  return `<img class="wardrobe-piece" data-cutout data-wardrobe-piece="${esc(item.id)}" src="${esc(item.image)}" alt="${esc(item.name)}"
+    style="left:${spot.x}${saved ? "px" : "%"};top:${spot.y}px">`;
+}
+
+function makeCanvasDraggable(board) {
+  $$("[data-wardrobe-piece]", board).forEach((el) => {
+    el.addEventListener("pointerdown", (down) => {
+      down.preventDefault();
+      el.setPointerCapture(down.pointerId);
+      el.style.zIndex = String(Date.now() % 100000);
+      const dx = down.clientX - el.offsetLeft;
+      const dy = down.clientY - el.offsetTop;
+      const move = (event) => {
+        el.style.left = `${Math.max(0, Math.min(board.clientWidth - el.offsetWidth, event.clientX - dx))}px`;
+        el.style.top = `${Math.max(0, Math.min(board.clientHeight - el.offsetHeight, event.clientY - dy))}px`;
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", () => {
+        el.removeEventListener("pointermove", move);
+        wardrobeLayout[el.dataset.wardrobePiece] = { x: Number.parseInt(el.style.left, 10), y: Number.parseInt(el.style.top, 10) };
+        saveWardrobeLayout();
+      }, { once: true });
+    });
+  });
+}
+
 export function render() {
   const groups = CATEGORIES.map((slot) => [slot, closet.filter((c) => c.slot === slot)]).filter(([, items]) => items.length);
   $("#wardrobe").innerHTML = `<section class="stack">
@@ -50,12 +79,21 @@ export function render() {
       <button class="btn btn-dark" data-action="wardrobe-add">${icon("camera")}${L("拍照加入", "Add a photo")}</button>
     </div>
     ${status}
+    ${closet.length ? `<div class="stack">
+      <div><div class="label">${L("自由搭配區", "Mix-and-match canvas")}</div>
+        <p class="muted">${L("拖曳你真正擁有的衣服，直接嘗試不同組合；位置會保存在這台裝置。", "Drag clothes you actually own to try combinations. Positions stay on this device.")}</p></div>
+      <div class="wardrobe-canvas-wrap"><div class="wardrobe-canvas" style="height:${Math.max(380, Math.ceil(closet.length / 3) * 140 + 30)}px">
+        ${closet.map(canvasPiece).join("")}
+      </div></div>
+    </div>` : ""}
     ${groups.length ? groups.map(([slot, items]) => `<div class="stack">
         <div class="label">${esc(SLOT_NAME[slot])} · ${items.length}</div>
         <div class="wardrobe-grid">${items.map(card).join("")}</div></div>`).join("")
       : empty(L("衣櫃還是空的。拍一件你常穿的衣服試試。", "Your closet is empty. Try photographing something you wear often."))}
   </section>`;
   applyCutouts($("#wardrobe"));
+  const canvas = $(".wardrobe-canvas", $("#wardrobe"));
+  if (canvas) makeCanvasDraggable(canvas);
 }
 
 export async function addPhoto() {
@@ -140,6 +178,8 @@ function openGarment(item) {
       remove: () => {
         if (!confirm(L(`從衣櫃刪除「${item.name}」？`, `Remove "${item.name}" from your closet?`))) return;
         closet.splice(closet.indexOf(item), 1);
+        delete wardrobeLayout[item.id];
+        saveWardrobeLayout();
         saveCloset();
         closeSheet();
         render();
